@@ -1,4 +1,5 @@
-OPTIONS SHORT CIRCUIT
+OPTIONS
+SHORT CIRCUIT
 IMPORT os
 IMPORT util
 &include "fglunzip_version.inc"
@@ -109,12 +110,12 @@ FUNCTION printStderr(errstr STRING)
   CALL ch.close()
 END FUNCTION
 
-FUNCTION printStdout(str STRING,noNewLine BOOLEAN)
+FUNCTION printStdout(str STRING, noNewLine BOOLEAN)
   IF noNewLine THEN
-    LET _stdoutNONL=_stdoutNONL,str
+    LET _stdoutNONL = _stdoutNONL, str
   ELSE
-    LET str=_stdoutNONL,str
-    LET _stdoutNONL=""
+    LET str = _stdoutNONL, str
+    LET _stdoutNONL = ""
     DISPLAY str
   END IF
 END FUNCTION
@@ -179,8 +180,10 @@ FUNCTION quoteUrl(url) RETURNS STRING
   IF isWin() THEN
     RETURN winQuoteUrl(url)
   END IF
-  IF url.getIndexOf(" ",1)>0  OR url.getIndexOf("?",1)>0 OR url.getIndexOf("&",1)>0 THEN
-    LET url='"',url,'"'
+  IF url.getIndexOf(" ", 1) > 0
+      OR url.getIndexOf("?", 1) > 0
+      OR url.getIndexOf("&", 1) > 0 THEN
+    LET url = '"', url, '"'
   END IF
   RETURN url
 END FUNCTION
@@ -324,20 +327,20 @@ FUNCTION readTextFile(filename STRING) RETURNS STRING
     LOCATE t IN FILE filename
     LET content = t
   CATCH
-    DISPLAY "readTextFile error:",err_get(status)
+    DISPLAY "readTextFile error:", err_get(status)
   END TRY
   RETURN content
 END FUNCTION
 
 FUNCTION readTextFileC(filename STRING) RETURNS STRING
-  DEFINE content,line STRING
+  DEFINE content, line STRING
   IF NOT os.Path.exists(filename) THEN
     CALL myErr(SFMT("can't open:%1", filename))
   END IF
-  VAR c=base.Channel.create()
-  CALL c.openFile(filename,"r")
-  WHILE (line:=c.readLine()) IS NOT NULL
-    LET content=content.append(line)
+  VAR c = base.Channel.create()
+  CALL c.openFile(filename, "r")
+  WHILE (line := c.readLine()) IS NOT NULL
+    LET content = content.append(line)
   END WHILE
   RETURN content
 END FUNCTION
@@ -403,9 +406,7 @@ END FUNCTION
 FUNCTION printVersion()
   VAR prog = removeExtension(os.Path.baseName(arg_val(0)))
   DISPLAY SFMT("%1 %2 rev%3",
-      prog,
-      GIT_VERSION,
-      adjustGitCountAndRev(GIT_COMMIT_COUNT, GIT_REV))
+      prog, GIT_VERSION, adjustGitCountAndRev(GIT_COMMIT_COUNT, GIT_REV))
   EXIT PROGRAM 0
 END FUNCTION
 
@@ -451,17 +452,17 @@ END FUNCTION
 
 FUNCTION kill(pid STRING)
   IF isWin() THEN
-    RUN sfmt("taskkill /F /PID %1 > NUL",pid)
+    RUN SFMT("taskkill /F /PID %1 > NUL", pid)
   ELSE
-    RUN sfmt("kill %1",pid)
+    RUN SFMT("kill %1", pid)
   END IF
 END FUNCTION
 
 FUNCTION kill9(pid STRING)
   IF isWin() THEN
-    RUN sfmt("taskkill /F /PID %1 > NUL",pid)
+    RUN SFMT("taskkill /F /PID %1 > NUL", pid)
   ELSE
-    RUN sfmt("kill -9 %1",pid)
+    RUN SFMT("kill -9 %1", pid)
   END IF
 END FUNCTION
 
@@ -526,8 +527,8 @@ FUNCTION findFreeServerPort(start, end, local)
 END FUNCTION
 
 FUNCTION readPortFile(portfile STRING) RETURNS INT
-  VAR portstr=readTextFile(portfile)
-  VAR port=parseInt(portstr)
+  VAR portstr = readTextFile(portfile)
+  VAR port = parseInt(portstr)
   MYASSERT(port IS NOT NULL AND port <> 0)
   RETURN port
 END FUNCTION
@@ -642,8 +643,8 @@ FUNCTION setLastModified(fn STRING, t INT)
 END FUNCTION
 
 FUNCTION isLetter(c STRING)
-  VAR letters="abcdefghijklmnopqrstuvwxyz"
-  RETURN getIndexOfI(src: letters,pattern: c,idx: 1) > 0
+  VAR letters = "abcdefghijklmnopqrstuvwxyz"
+  RETURN getIndexOfI(src: letters, pattern: c, idx: 1) > 0
 END FUNCTION
 
 FUNCTION isWinDriveInt(path STRING)
@@ -663,8 +664,8 @@ END FUNCTION
 
 #creates a directory path recursively like mkdir -p
 FUNCTION mkdirp(path STRING)
-  VAR winbase=FALSE
-  VAR level=0
+  VAR winbase = FALSE
+  VAR level = 0
   IF isWin() AND path.getIndexOf("\\", 1) > 0 THEN
     LET path = backslash2slash(path)
   END IF
@@ -672,20 +673,20 @@ FUNCTION mkdirp(path STRING)
   CASE
     WHEN path.getCharAt(1) == "/"
       LET basedir = "/"
-    --check for driveletter: as path start
+      --check for driveletter: as path start
     WHEN pathStartsWithWinDrive(path)
-      LET basedir = path.subString(1,2)
+      LET basedir = path.subString(1, 2)
       --DISPLAY "winbase:",basedir
-      LET winbase=TRUE
+      LET winbase = TRUE
   END CASE
   VAR tok = base.StringTokenizer.create(path, "/")
   VAR part = basedir
   WHILE tok.hasMoreTokens()
-    LET level=level+1
-    VAR next=tok.nextToken()
+    LET level = level + 1
+    VAR next = tok.nextToken()
     --DISPLAY "part0:",part,",next:",next
-    IF level==1 AND winbase THEN
-      MYASSERT(basedir==next)
+    IF level == 1 AND winbase THEN
+      MYASSERT(basedir == next)
       --DISPLAY "next level"
       CONTINUE WHILE
     END IF
@@ -707,11 +708,11 @@ FUNCTION mkdirp(path STRING)
   END WHILE
 END FUNCTION
 
-FUNCTION writeStartFile(startfile STRING, port INT,pid INT)
+FUNCTION writeStartFile(startfile STRING, port INT, pid INT)
   DEFINE entries TStartEntries
   LET entries.port = port
   LET entries.pid = pid
-  CALL writeStartFileE(startfile,entries)
+  CALL writeStartFileE(startfile, entries)
 END FUNCTION
 
 FUNCTION writeStartFileE(startfile STRING, entries TStartEntries INOUT)
@@ -719,21 +720,21 @@ FUNCTION writeStartFileE(startfile STRING, entries TStartEntries INOUT)
   IF startfile IS NULL THEN
     RETURN
   END IF
-  VAR s=util.JSON.stringify(entries)
-  CALL log(sfmt("writeStartFileE:%1,entries:%2", startfile,s))
+  VAR s = util.JSON.stringify(entries)
+  CALL log(SFMT("writeStartFileE:%1,entries:%2", startfile, s))
   VAR ch = base.Channel.create()
   CALL ch.openFile(startfile, "w")
   CALL ch.writeLine(s)
   CALL ch.close()
 END FUNCTION
 
-FUNCTION waitForStartFile(fname STRING,fromApp STRING) RETURNS TStartEntries
+FUNCTION waitForStartFile(fname STRING, fromApp STRING) RETURNS TStartEntries
   DEFINE s STRING
   DEFINE entries TStartEntries
   DEFINE i INT
   FOR i = 1 TO 10
     IF NOT os.Path.exists(fname) THEN
-      LET s=""
+      LET s = ""
     ELSE
       LET s = readTextFile(fname)
       LET s = s.trim()
@@ -743,12 +744,11 @@ FUNCTION waitForStartFile(fname STRING,fromApp STRING) RETURNS TStartEntries
       CALL util.JSON.parse(s, entries)
       RETURN entries
     CATCH
-      DISPLAY "wait for pid in:", fname ," ..."
+      DISPLAY "wait for pid in:", fname, " ..."
       SLEEP 1
     END TRY
   END FOR
-  CALL myErr(
-    SFMT("%1 didn't create the start file '%1'",fromApp,fname))
+  CALL myErr(SFMT("%1 didn't create the start file '%1'", fromApp, fname))
   RETURN entries
 END FUNCTION
 
@@ -764,25 +764,25 @@ FUNCTION exitQA(err STRING)
 END FUNCTION
 
 FUNCTION touch(fname STRING)
-  VAR s=""
-  VAR c=base.Channel.create()
-  CALL c.openFile(fname,"ab")
+  VAR s = ""
+  VAR c = base.Channel.create()
+  CALL c.openFile(fname, "ab")
   CALL c.writeNoNL(s)
   CALL c.close()
 END FUNCTION
 
 FUNCTION RUNtouch(fname STRING)
   DEFINE cmd STRING
-  VAR quoted=quote(fname)
+  VAR quoted = quote(fname)
   IF NOT isWin() THEN
-    LET cmd=sfmt("touch %1",quoted)
+    LET cmd = SFMT("touch %1", quoted)
   ELSE
-    LET cmd=sfmt("type nul >> %1 && copy /b %2 +,,",quoted,quoted)
+    LET cmd = SFMT("type nul >> %1 && copy /b %2 +,,", quoted, quoted)
   END IF
-  VAR code=0
+  VAR code = 0
   RUN cmd RETURNING code
   IF code THEN
-    CALL myErr(sfmt("RUNtouch failed to RUN:%1",cmd))
+    CALL myErr(SFMT("RUNtouch failed to RUN:%1", cmd))
   END IF
 END FUNCTION
 
@@ -821,81 +821,83 @@ FUNCTION cutStringFromEnd(s STRING, toCut STRING)
 END FUNCTION
 
 FUNCTION cutExtension(fname STRING) RETURNS STRING
-  VAR ext=os.Path.extension(fname)
-  IF ext IS NOT NULL AND ext.getLength()>0 THEN
-    LET fname=cutStringFromEnd(fname,sfmt(".%1",ext))
+  VAR ext = os.Path.extension(fname)
+  IF ext IS NOT NULL AND ext.getLength() > 0 THEN
+    LET fname = cutStringFromEnd(fname, SFMT(".%1", ext))
   END IF
   RETURN fname
 END FUNCTION
 
-FUNCTION findPidOf(cmd STRING,errWhenNotFound BOOLEAN) RETURNS INT
+FUNCTION findPidOf(cmd STRING, errWhenNotFound BOOLEAN) RETURNS INT
   DEFINE pscmd, line STRING
   DEFINE c base.Channel
-  DEFINE pid,pidIdx INT
-  LET pid=-1
-  LET pidIdx=-1
+  DEFINE pid, pidIdx INT
+  LET pid = -1
+  LET pidIdx = -1
   IF NOT isWin() THEN --remove some quoting on Unix
     LET cmd = replace(src: cmd, oldStr: '"', newString: "")
     LET cmd = cutStringFromEnd(cmd, "&update=1")
   END IF
   LET cmd = cutStringFromEnd(cmd, "?iframe=true")
-  DISPLAY progName(),":findPidOf:'",cmd,"'"
+  DISPLAY progName(), ":findPidOf:'", cmd, "'"
   IF isMac() OR isLinux() THEN
     LET pscmd = 'ps -o "pid command"' --"ps -f"
   ELSE
     LET pscmd = 'wmic process get processid,commandline'
   END IF
-  LET c=base.Channel.create()
-  CALL c.openPipe(pscmd,"r")
-  VAR found=FALSE
+  LET c = base.Channel.create()
+  CALL c.openPipe(pscmd, "r")
+  VAR found = FALSE
   IF isWin() THEN
-    VAR firstline=c.readLine()
-    LET pidIdx=firstline.getIndexOf("ProcessId",1)
+    VAR firstline = c.readLine()
+    LET pidIdx = firstline.getIndexOf("ProcessId", 1)
     MYASSERT(pidIdx > 0)
   END IF
-  WHILE (line:=c.readLine()) IS NOT NULL 
+  WHILE (line := c.readLine()) IS NOT NULL
     --DISPLAY "line:", line
-    IF isWin() AND line.getIndexOf("cmd.exe /c",1)>0 THEN --filter out cmd for browser
+    IF isWin()
+        AND line.getIndexOf("cmd.exe /c", 1)
+            > 0 THEN --filter out cmd for browser
       --DISPLAY "filter out:",line
       CONTINUE WHILE
     END IF
-    IF line.getIndexOf("--type=",1)>0 THEN
+    IF line.getIndexOf("--type=", 1) > 0 THEN
       CONTINUE WHILE
     END IF
     --IF line.getIndexOf("--user-data-dir",1)>0 THEN
     --  DISPLAY "may be:",line
     --  DISPLAY "mustbe:",cmd
     --END IF
-    IF line.getIndexOf(cmd,1)<>0 THEN
-      LET pid=extractPidFromLine(line,pidIdx)
-      DISPLAY "!!!!found pid:",pid," in line:",line
-      LET found=TRUE
+    IF line.getIndexOf(cmd, 1) <> 0 THEN
+      LET pid = extractPidFromLine(line, pidIdx)
+      DISPLAY "!!!!found pid:", pid, " in line:", line
+      LET found = TRUE
       EXIT WHILE
     END IF
   END WHILE
-  IF errWhenNotFound AND  NOT found THEN
-    CALL myErr(sfmt("didn't find browser cmdline '%1' in process list",cmd))
+  IF errWhenNotFound AND NOT found THEN
+    CALL myErr(SFMT("didn't find browser cmdline '%1' in process list", cmd))
   END IF
   RETURN pid
 END FUNCTION
 
-FUNCTION extractPidFromLine(line STRING,pidIdx INT) RETURNS INT
+FUNCTION extractPidFromLine(line STRING, pidIdx INT) RETURNS INT
   DEFINE tok base.StringTokenizer
   DEFINE first STRING
   DEFINE pid INT
-  DISPLAY sfmt("extractPidFromLine:'%1',pidIdx:%2",line,pidIdx)
-  IF pidIdx>=0 THEN
-    LET line=line.subString(pidIdx,line.getLength())
+  DISPLAY SFMT("extractPidFromLine:'%1',pidIdx:%2", line, pidIdx)
+  IF pidIdx >= 0 THEN
+    LET line = line.subString(pidIdx, line.getLength())
   END IF
-  LET tok=base.StringTokenizer.create(line," ")
+  LET tok = base.StringTokenizer.create(line, " ")
   WHILE tok.hasMoreTokens()
-    LET first=tok.nextToken()
-    IF first.getLength()==0 THEN
+    LET first = tok.nextToken()
+    IF first.getLength() == 0 THEN
       CONTINUE WHILE
     END IF
-    LET first=first.trimWhiteSpace()
-    LET pid=first
-    DISPLAY "first:",first,",pid:",pid
+    LET first = first.trimWhiteSpace()
+    LET pid = first
+    DISPLAY "first:", first, ",pid:", pid
     RETURN pid
   END WHILE
   CALL myErr("must not end here")
@@ -912,11 +914,11 @@ FUNCTION progName() RETURNS STRING
 END FUNCTION
 
 FUNCTION qaTrace(msg STRING)
-  DISPLAY progName(),":",msg
+  DISPLAY progName(), ":", msg
 END FUNCTION
 
 FUNCTION getAppDirAsset(asset STRING) RETURNS STRING
-  RETURN os.Path.join(os.Path.dirName(arg_val(0)),asset)
+  RETURN os.Path.join(os.Path.dirName(arg_val(0)), asset)
 END FUNCTION
 
 PRIVATE FUNCTION findGBCIn(dirname STRING)
@@ -934,7 +936,7 @@ END FUNCTION
 
 FUNCTION checkCustomGBC(gbcdir STRING)
   IF NOT os.Path.isDirectory(gbcdir) THEN
-    CALL userError(sfmt("custom GBC dir '%1' is not a directory", gbcdir))
+    CALL userError(SFMT("custom GBC dir '%1' is not a directory", gbcdir))
   END IF
   IF NOT findGBCIn(gbcdir) THEN
     CALL userError(
@@ -965,7 +967,7 @@ END FUNCTION
 
 FUNCTION getGBCVersion() RETURNS STRING
   IF _gbc_dir IS NULL THEN
-    LET _gbc_dir=getGBCDir(os.Path.pwd())
+    LET _gbc_dir = getGBCDir(os.Path.pwd())
   END IF
   RETURN _gbc_version
 END FUNCTION
@@ -988,19 +990,21 @@ FUNCTION checkGBCVersion()
 END FUNCTION
 
 FUNCTION checkGWADIR()
-  VAR owndir=os.Path.fullPath(os.Path.dirName(arg_val(0)))
-  IF os.Path.exists(os.Path.join(owndir,"README.gwabuildtool")) THEN
+  VAR owndir = os.Path.fullPath(os.Path.dirName(arg_val(0)))
+  IF os.Path.exists(os.Path.join(owndir, "README.gwabuildtool")) THEN
     -- DISPLAY "in repo detected"
     RETURN
   END IF
   --just check if the GWADIR passed is matching with us
-  VAR gwadir=fgl_getenv("GWADIR")
+  VAR gwadir = fgl_getenv("GWADIR")
   IF gwadir IS NULL THEN
     RETURN
   END IF
-  VAR gwabuildtooldir=os.Path.fullPath(os.Path.join(gwadir,"lib/gwa"))
+  VAR gwabuildtooldir = os.Path.fullPath(os.Path.join(gwadir, "lib/gwa"))
   IF NOT owndir.equals(gwabuildtooldir) THEN
-    CALL myErr(sfmt("$GWADIR/lib/gwa:%1<>directory:%2 of:%3",gwabuildtooldir,owndir,arg_val(0)))
+    CALL myErr(
+        SFMT("$GWADIR/lib/gwa:%1<>directory:%2 of:%3",
+            gwabuildtooldir, owndir, arg_val(0)))
   END IF
 END FUNCTION
 
@@ -1054,7 +1058,12 @@ FUNCTION isDigit(c STRING)
 END FUNCTION
 
 FUNCTION parseIntForVersion(
-    version STRING, sub STRING, what STRING, partdesc STRING, canHavePre BOOLEAN, canHavePost BOOLEAN)
+    version STRING,
+    sub STRING,
+    what STRING,
+    partdesc STRING,
+    canHavePre BOOLEAN,
+    canHavePost BOOLEAN)
     RETURNS INT
   DEFINE i, num INT
   DEFINE c, accu, pre, post STRING
@@ -1065,8 +1074,9 @@ FUNCTION parseIntForVersion(
         IF isDigit(c) THEN
           LET accu = c
           IF pre.getLength() > 0 AND NOT canHavePre THEN
-            CALL myErr(SFMT("%1 '%2': must not have leading characters('%3') for %4 part:'%5'",
-                what, version, pre, partdesc, sub))
+            CALL myErr(
+                SFMT("%1 '%2': must not have leading characters('%3') for %4 part:'%5'",
+                    what, version, pre, partdesc, sub))
           END IF
         ELSE
           LET pre = pre, c
@@ -1081,8 +1091,9 @@ FUNCTION parseIntForVersion(
           ELSE
             LET post = sub.subString(i, sub.getLength())
             IF post.getLength() > 0 AND NOT canHavePost THEN
-              CALL myErr(SFMT("%1 '%2': must not have trailing characters('%3') for %4 part:'%5'",
-                  what, version, post, partdesc, sub))
+              CALL myErr(
+                  SFMT("%1 '%2': must not have trailing characters('%3') for %4 part:'%5'",
+                      what, version, post, partdesc, sub))
             END IF
           END IF
           RETURN num
@@ -1091,7 +1102,9 @@ FUNCTION parseIntForVersion(
   END FOR
   LET num = accu
   IF num IS NULL THEN
-    CALL myErr(sfmt("%1 '%2': Can't find number in '%3' for %4 part", what,version, sub, partdesc))
+    CALL myErr(
+        SFMT("%1 '%2': Can't find number in '%3' for %4 part",
+            what, version, sub, partdesc))
   END IF
   RETURN num
 END FUNCTION
@@ -1147,29 +1160,33 @@ FUNCTION parseMajorMinorBuild(version STRING, description STRING)
   RETURN major, minor, build
 END FUNCTION
 
-FUNCTION version1GreaterThanVersion2(version1 STRING,version2 STRING)
-  DEFINE major1,major2,minor1,minor2,build1,build2 INT
-  CALL parseMajorMinorBuild(version1,description: "version1") RETURNING major1,minor1,build1
-  CALL parseMajorMinorBuild(version2,description: "version2") RETURNING major2,minor2,build2
-  RETURN major1>major2 OR
-         (major1==major2 AND minor1>minor2) OR
-         (major1==major2 AND minor1=minor2 AND build1>build2)
+FUNCTION version1GreaterThanVersion2(version1 STRING, version2 STRING)
+  DEFINE major1, major2, minor1, minor2, build1, build2 INT
+  CALL parseMajorMinorBuild(version1, description: "version1")
+      RETURNING major1, minor1, build1
+  CALL parseMajorMinorBuild(version2, description: "version2")
+      RETURNING major2, minor2, build2
+  RETURN major1 > major2
+      OR (major1 == major2 AND minor1 > minor2)
+      OR (major1 == major2 AND minor1 = minor2 AND build1 > build2)
 END FUNCTION
 
-FUNCTION version1SmallerThanVersion2(version1 STRING,version2 STRING)
-  DEFINE major1,major2,minor1,minor2,build1,build2 INT
-  CALL parseMajorMinorBuild(version1,description: "version1") RETURNING major1,minor1,build1
-  CALL parseMajorMinorBuild(version2,description: "version2") RETURNING major2,minor2,build2
-  RETURN major1<major2 OR
-         (major1==major2 AND minor1<minor2) OR
-         (major1==major2 AND minor1=minor2 AND build1<build2)
+FUNCTION version1SmallerThanVersion2(version1 STRING, version2 STRING)
+  DEFINE major1, major2, minor1, minor2, build1, build2 INT
+  CALL parseMajorMinorBuild(version1, description: "version1")
+      RETURNING major1, minor1, build1
+  CALL parseMajorMinorBuild(version2, description: "version2")
+      RETURNING major2, minor2, build2
+  RETURN major1 < major2
+      OR (major1 == major2 AND minor1 < minor2)
+      OR (major1 == major2 AND minor1 = minor2 AND build1 < build2)
 END FUNCTION
 
 #+ by default all GWA tools and tests operate on 'localhost'
 #+ can be configured to '127.0.0.1' when setting GWA_LOCALHOST
 FUNCTION localhost() RETURNS STRING
-  VAR lc=fgl_getenv("GWA_LOCALHOST")
-  IF lc=="127.0.0.1" OR lc=="loopback" THEN
+  VAR lc = fgl_getenv("GWA_LOCALHOST")
+  IF lc == "127.0.0.1" OR lc == "loopback" THEN
     RETURN "127.0.0.1"
   END IF
   RETURN "localhost"
@@ -1537,7 +1554,7 @@ FUNCTION millisecondsSinceEpoch() RETURNS BIGINT
 END FUNCTION
 
 FUNCTION getMakeCmd() RETURNS STRING
-  VAR makeEnv=fgl_getenv("MAKE")
+  VAR makeEnv = fgl_getenv("MAKE")
   IF makeEnv IS NOT NULL THEN
     RETURN makeEnv
   END IF
