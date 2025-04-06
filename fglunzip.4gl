@@ -5,16 +5,14 @@ IMPORT os
 IMPORT FGL futils
 IMPORT FGL mygetopt
 &include "myassert.inc"
---IMPORT FGL fgldialog
-DEFINE _product_zip STRING
+DEFINE _product_zip STRING --the zip file to process
 DEFINE _opt_verbose BOOLEAN
-DEFINE _opt_quiet BOOLEAN
-DEFINE _opt_logfile STRING
+--DEFINE _opt_quiet BOOLEAN
+--DEFINE _opt_logfile STRING
 DEFINE _opt_in_FGLDIR BOOLEAN
 --DEFINE _opt_ext_dir STRING
 DEFINE _opt_simulate BOOLEAN
 DEFINE _opt_undo BOOLEAN
---DEFINE _root om.DomNode --holds the file list from the zip as a DOM tree
 MAIN
   --DEFINE fglgui, fglrunExe, cmd STRING
   --DEFINE code INT
@@ -37,17 +35,11 @@ MAIN
     EXIT PROGRAM code
   END IF
   }
+  CALL checkTar()
   LET argsarr = setupArgs()
   --DISPLAY "argsarr:",util.JSON.stringify(argsarr)
   CALL parseArgs(argsarr)
   LET root = readFiles()
-  --DISPLAY yesno("testyesno")
-  {
-  DISPLAY 'isDir "bin":"', isDir(root, "bin")
-  DISPLAY 'fileExists "doc/gwa/location.html":"',
-      fileExists(root, "doc/gwa/location.html")
-  DISPLAY 'fileExists "foo":"', fileExists(root, "foo")
-  }
   LET numChildren = analyze(root)
   IF numChildren == 0 THEN
     CALL userError(SFMT("no entries found in:%1", _product_zip))
@@ -55,19 +47,24 @@ MAIN
   CALL doit(root, numChildren)
 END MAIN
 
+FUNCTION tarExe()
+  RETURN IIF(isWin(),"tar.exe","tar")
+END FUNCTION
+
+FUNCTION checkTar()
+  DEFINE tar STRING
+  LET tar=tarExe()
+  IF whichExe(tar) IS NULL THEN
+    CALL userError(sfmt("Couldn't find program:%1 on your system, please install",tar))
+  END IF
+END FUNCTION
+
 FUNCTION unzipList()
   --DEFINE cmd,res,err STRING
   DEFINE cmd STRING
-  LET cmd = SFMT("tar tf %1", quote(_product_zip))
-  DISPLAY "unzipList cmd:", cmd
+  LET cmd = SFMT("%1 tf %2", tarExe(), quote(_product_zip))
+  --DISPLAY "unzipList cmd:", cmd
   RETURN getProgramOutput(cmd)
-  {
-  IF err THEN
-    CALL printStderr(err)
-  ELSE
-    DISPLAY res
-  END IF
-  }
 END FUNCTION
 
 FUNCTION passArgsViaEnv()
@@ -127,23 +124,26 @@ PRIVATE FUNCTION parseArgs(argsarr)
   LET o[i].opt_char = "s"
   LET o[i].arg_type = mygetopt.NONE
 
+  {
   LET i = o.getLength() + 1
   LET o[i].name = "quiet"
   LET o[i].description = "Does install quietly without asking yes/no"
   LET o[i].opt_char = "q"
   LET o[i].arg_type = mygetopt.NONE
+  }
 
   LET i = o.getLength() + 1
   LET o[i].name = "list"
   LET o[i].description = "Lists the archive content"
   LET o[i].opt_char = "l"
   LET o[i].arg_type = mygetopt.NONE
-
+  {
   LET i = o.getLength() + 1
   LET o[i].name = "logfile"
   LET o[i].description = "File written for logs and success"
   LET o[i].opt_char = "L"
   LET o[i].arg_type = mygetopt.REQUIRED
+  }
 
   LET i = o.getLength() + 1
   LET o[i].name = "use-FGLDIR"
@@ -176,15 +176,19 @@ PRIVATE FUNCTION parseArgs(argsarr)
         EXIT PROGRAM 0
       WHEN 'v'
         LET _opt_verbose = TRUE
+      {
       WHEN 'q'
         LET _opt_quiet = TRUE
+      }
       WHEN 'h'
         CALL mygetopt.displayUsage(gr, "fjs-<product>.zip")
         EXIT PROGRAM 0
       WHEN 'l'
         LET listSeen = TRUE
+      {
       WHEN 'L'
         LET _opt_logfile = opt_arg
+      }
       WHEN 'F'
         LET _opt_in_FGLDIR = TRUE
       WHEN 's'
@@ -383,8 +387,10 @@ FUNCTION unzip(root)
     RETURN
   END IF
   --CALL generateUndoScript(root)
-  LET cmd = SFMT("tar xf %1", quote(_product_zip))
-  DISPLAY "unzip cmd:", cmd
+  LET cmd = SFMT("%1 xf %2", tarExe(), quote(_product_zip))
+  IF _opt_verbose THEN
+    DISPLAY "unzip cmd:", cmd
+  END IF
   RUN cmd RETURNING code
   IF code THEN
     EXIT PROGRAM code

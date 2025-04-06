@@ -39,8 +39,8 @@ if %errorlevel% NEQ 0 (
 
 :end
 if %compile% EQU 1 (
-  echo compile %src%, %reason%
+rem  echo compile %src%, %reason%
   fglcomp -M -r -Wall %src%
 ) else (
-  echo %m42% is up to date.
+rem  echo %m42% is up to date.
 )

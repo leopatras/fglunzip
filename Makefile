@@ -37,25 +37,14 @@ FORMS=$(patsubst %.per,%.42f,$(wildcard *.per))
 all:: $(MODS) $(FORMS)
 
 GIT_LONG_VERSION=$(shell git describe --tags --long --abbrev=8)
-GIT_CHECK=$(shell fglcomp -M checkgit && $(FGLRUN) checkgit "$(GIT_LONG_VERSION)")
-ifdef WINDIR
-$(warning GIT_CHECK=$(GIT_CHECK))
-else
-$(info GIT_CHECK=$(GIT_CHECK))
-endif
-#$(info $(GIT_CHECK))
+GIT_CHECK:=$(shell fglcomp -M checkgit && $(FGLRUN) checkgit "$(GIT_LONG_VERSION)")
+
+#$(info GIT_CHECK=$(GIT_CHECK))
 
 futils.42m: fglunzip_version.inc
 
-gwaURI.42m: futils.42m
-
-fglwebrun/fglwebrun.4gl:
-	-git submodule init fglwebrun
-	-git submodule update fglwebrun
-
 echo:
 	echo "MODS: $(MODS), GIT_LONG_VERSION: $(GIT_LONG_VERSION)"
-	echo "FGLLDPATH:$$FGLLDPATH"
 
 doc:
 	fglcomp --build-doc location.4gl
@@ -63,6 +52,9 @@ doc:
 
 format:
 	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace futils.4gl
+	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace fglunzip.4gl
+	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace checkgit.4gl
+	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace mygetopt.4gl
 
 clean:
 	rm -f *.42? fglunzip_version.inc

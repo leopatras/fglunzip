@@ -7,26 +7,26 @@ DEFINE git_fgl_version STRING
 DEFINE git_fgl_commit_count STRING
 DEFINE git_fgl_rev STRING
 MAIN
+  DEFINE verbose BOOLEAN
+  LET verbose=fgl_getenv("VERBOSE") IS NOT NULL
   CALL parseVersion(arg_val(1), FALSE)
-  {
-  VAR fglver=arg_val(2)
-  VAR firstChar=fglver.getCharAt(1)
-  IF firstChar<>"v" OR NOT isNumber(firstChar) THEN
-    LET fglver=arg_val(3)
-  END IF
-  CALL parseVersion(fglver, TRUE)
-  }
   VAR versionContent = SFMT("%1", formatContent())
   IF NOT os.Path.exists(FGLUTILS_VERSION_INC) THEN
-    DISPLAY FGLUTILS_VERSION_INC, " not found: create."
+    IF verbose THEN
+      DISPLAY FGLUTILS_VERSION_INC, " not found: create."
+    END IF
     CALL writeStringToFile(FGLUTILS_VERSION_INC, versionContent)
   ELSE
     VAR prevContent = readTextFile(FGLUTILS_VERSION_INC)
     IF NOT versionContent.equals(prevContent) THEN
-      DISPLAY FGLUTILS_VERSION_INC, " overwrite with new version:\n", versionContent
+      IF verbose THEN
+        DISPLAY FGLUTILS_VERSION_INC, " overwrite with new version:\n", versionContent
+      END IF
       CALL writeStringToFile(FGLUTILS_VERSION_INC, versionContent)
     ELSE
-      DISPLAY FGLUTILS_VERSION_INC, " good version."
+      IF verbose THEN
+        DISPLAY FGLUTILS_VERSION_INC, " good version."
+      END IF
     END IF
   END IF
 END MAIN

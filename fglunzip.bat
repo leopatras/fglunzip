@@ -8,18 +8,21 @@ FOR %%i IN ("%CD%") DO (
 pushd %CD%
 %THISDRIVE%
 cd %FGLUNZIPDIR%
-rem compile mygetopt first as it is used by fglunzip
 set FGL_LENGTH_SEMANTICS=BYTE
 set LANG=.fglutf8
+rem compile checkgit first 
 CALL myfglcomp checkgit
 IF %errorlevel% NEQ 0 GOTO myend
-FOR /F "delims==" %%x IN ('git describe --tags --long --abbrev=8') DO set GIT_LONG_VERSION=%%x
+git describe --tags --long --abbrev=8 >git_ver.txt
+set /P GIT_LONG_VERSION=<git_ver.txt
+del /Q git_ver.txt
 IF %errorlevel% NEQ 0 GOTO myend
 fglrun checkgit %GIT_LONG_VERSION%
 IF %errorlevel% NEQ 0 GOTO myend
-CALL myfglcomp mygetopt
+REM uses inc file
+CALL fglcomp -M -r -Wall futils
 IF %errorlevel% NEQ 0 GOTO myend
-CALL myfglcomp futils
+CALL myfglcomp mygetopt
 IF %errorlevel% NEQ 0 GOTO myend
 CALL myfglcomp fglunzip
 IF %errorlevel% NEQ 0 GOTO myend

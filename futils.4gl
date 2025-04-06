@@ -1566,8 +1566,9 @@ FUNCTION whichDaemonize() RETURNS STRING
 END FUNCTION
 
 FUNCTION whichExe(prog STRING) RETURNS STRING
-  DEFINE exe, err STRING
-  CALL getProgramOutputWithErr(SFMT("which %1", quote(prog))) RETURNING exe, err
+  DEFINE exe, err,cmd STRING
+  LET cmd=IIF(isWin(),"where","which")
+  CALL getProgramOutputWithErr(SFMT("%1 %2", cmd, quote(prog))) RETURNING exe, err
   IF err IS NOT NULL THEN
     --DISPLAY SFMT("which error for '%1':%2", prog, err)
     RETURN NULL
