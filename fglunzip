@@ -14,8 +14,8 @@ cd "$FGLUNZIPDIR"
 source "$FGLUNZIPDIR/myfglcomp.sh"
 GIT_LONG_VERSION=`git describe --tags --long --abbrev=8`
 myfglcomp checkgit && fglrun checkgit "$GIT_LONG_VERSION"
-myfglcomp futils
-myfglcomp fglunzip
+fglcomp -M -r -Wall fglunzip
+myfglcomp mygetopt
 popd > /dev/null
 export FGLUNZIPDIR
 #exec fglrun -p $FGLUNZIPDIR/fgljp.42m "$@"

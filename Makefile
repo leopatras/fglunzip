@@ -45,17 +45,12 @@ GIT_CHECK:=$(shell fglcomp -M checkgit && $(FGLRUN) checkgit "$(GIT_LONG_VERSION
 
 #$(info GIT_CHECK=$(GIT_CHECK))
 
-futils.42m: fglunzip_version.inc
+fglunzip.42m: fglunzip_version.inc
 
 echo:
 	echo "MODS: $(MODS), GIT_LONG_VERSION: $(GIT_LONG_VERSION)"
 
-doc:
-	fglcomp --build-doc location.4gl
-	fglcomp --build-doc app.4gl
-
 format:
-	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace futils.4gl
 	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace fglunzip.4gl
 	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace checkgit.4gl
 	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace mygetopt.4gl

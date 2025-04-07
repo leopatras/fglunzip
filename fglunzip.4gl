@@ -1,40 +1,23 @@
---IMPORT util
 OPTIONS
 SHORT CIRCUIT
 IMPORT os
-IMPORT FGL futils
 IMPORT FGL mygetopt
+&include "fglunzip_version.inc"
 &include "myassert.inc"
 DEFINE _product_zip STRING --the zip file to process
 DEFINE _opt_verbose BOOLEAN
---DEFINE _opt_quiet BOOLEAN
---DEFINE _opt_logfile STRING
 DEFINE _opt_in_FGLDIR BOOLEAN
---DEFINE _opt_ext_dir STRING
 DEFINE _opt_simulate BOOLEAN
 DEFINE _opt_undo BOOLEAN
+--DEFINE _stdoutNONL STRING
+--TODO
+--DEFINE _opt_quiet BOOLEAN
+--DEFINE _opt_logfile STRING
+--DEFINE _opt_ext_dir STRING
 MAIN
-  --DEFINE fglgui, fglrunExe, cmd STRING
-  --DEFINE code INT
   DEFINE argsarr DYNAMIC ARRAY OF STRING
   DEFINE root om.DomNode
   DEFINE numChildren INT
-  {
-  LET fglgui = fgl_getenv("FGLGUI")
-  --DISPLAY "fglgui:",fglgui
-  IF NOT fglgui.equals("0") THEN
-    CALL fgl_setenv("FGLGUI", "0")
-    --don't mess with Unix and windows shell quoting, just use the env
-    --to pass the args
-    CALL passArgsViaEnv()
-    LET fglrunExe = futils.fglrunEXE()
-    LET cmd = SFMT("%1 %2", quote(fglrunExe), quote(arg_val(0)))
-    --DISPLAY "RUN cmd:",cmd
-    RUN cmd RETURNING code
-    --DISPLAY "code:",code
-    EXIT PROGRAM code
-  END IF
-  }
   CALL checkTar()
   LET argsarr = setupArgs()
   --DISPLAY "argsarr:",util.JSON.stringify(argsarr)
@@ -61,35 +44,18 @@ FUNCTION checkTar()
 END FUNCTION
 
 FUNCTION unzipList()
-  --DEFINE cmd,res,err STRING
   DEFINE cmd STRING
   LET cmd = SFMT("%1 tf %2", tarExe(), quote(_product_zip))
   --DISPLAY "unzipList cmd:", cmd
   RETURN getProgramOutput(cmd)
 END FUNCTION
 
-FUNCTION passArgsViaEnv()
-  DEFINE i INT
-  CALL fgl_setenv("_FGLUNZIP_NUMARGS", num_args())
-  FOR i = 1 TO num_args()
-    CALL fgl_setenv(SFMT("_FGLUNZIP_ARG_NUMARGS%1", i), arg_val(i))
-  END FOR
-END FUNCTION
-
 FUNCTION setupArgs()
-  DEFINE i, mynumargs INT
+  DEFINE i INT
   DEFINE argsarr DYNAMIC ARRAY OF STRING
-  LET mynumargs = fgl_getenv("_FGLUNZIP_NUMARGS")
-  IF mynumargs IS NOT NULL THEN
-    --receive args via env
-    FOR i = 1 TO mynumargs
-      LET argsarr[i] = fgl_getenv(SFMT("_FGLUNZIP_ARG_NUMARGS%1", i))
-    END FOR
-  ELSE
-    FOR i = 1 TO num_args()
-      LET argsarr[i] = arg_val(i)
-    END FOR
-  END IF
+  FOR i = 1 TO num_args()
+    LET argsarr[i] = arg_val(i)
+  END FOR
   RETURN argsarr
 END FUNCTION
 
@@ -121,30 +87,15 @@ PRIVATE FUNCTION parseArgs(argsarr)
 
   LET i = o.getLength() + 1
   LET o[i].name = "simulate"
-  LET o[i].description = "simulates what would be extracted"
+  LET o[i].description = "simulates what would be extracted/deleted"
   LET o[i].opt_char = "s"
   LET o[i].arg_type = mygetopt.NONE
-
-  {
-  LET i = o.getLength() + 1
-  LET o[i].name = "quiet"
-  LET o[i].description = "Does install quietly without asking yes/no"
-  LET o[i].opt_char = "q"
-  LET o[i].arg_type = mygetopt.NONE
-  }
 
   LET i = o.getLength() + 1
   LET o[i].name = "list"
   LET o[i].description = "Lists the archive content"
   LET o[i].opt_char = "l"
   LET o[i].arg_type = mygetopt.NONE
-  {
-  LET i = o.getLength() + 1
-  LET o[i].name = "logfile"
-  LET o[i].description = "File written for logs and success"
-  LET o[i].opt_char = "L"
-  LET o[i].arg_type = mygetopt.REQUIRED
-  }
 
   LET i = o.getLength() + 1
   LET o[i].name = "use-FGLDIR"
@@ -153,7 +104,19 @@ PRIVATE FUNCTION parseArgs(argsarr)
   LET o[i].opt_char = "F"
   LET o[i].arg_type = mygetopt.NONE
 
-  {
+  { --TODO
+  LET i = o.getLength() + 1
+  LET o[i].name = "quiet"
+  LET o[i].description = "Does install quietly without asking yes/no"
+  LET o[i].opt_char = "q"
+  LET o[i].arg_type = mygetopt.NONE
+
+  LET i = o.getLength() + 1
+  LET o[i].name = "logfile"
+  LET o[i].description = "File written for logs and success"
+  LET o[i].opt_char = "L"
+  LET o[i].arg_type = mygetopt.REQUIRED
+
   LET i = o.getLength() + 1
   LET o[i].name = "destination-dir"
   LET o[i].description =
@@ -173,30 +136,26 @@ PRIVATE FUNCTION parseArgs(argsarr)
     LET opt_arg = mygetopt.opt_arg(gr)
     CASE mygetopt.opt_char(gr)
       WHEN 'V'
-        CALL futils.printVersion()
+        CALL printVersion()
         EXIT PROGRAM 0
       WHEN 'v'
         LET _opt_verbose = TRUE
-        {
-        WHEN 'q'
-          LET _opt_quiet = TRUE
-        }
       WHEN 'h'
         CALL mygetopt.displayUsage(gr, "fjs-<product>.zip")
         EXIT PROGRAM 0
       WHEN 'l'
         LET listSeen = TRUE
-        {
-        WHEN 'L'
-          LET _opt_logfile = opt_arg
-        }
       WHEN 'F'
         LET _opt_in_FGLDIR = TRUE
       WHEN 's'
         LET _opt_simulate = TRUE
       WHEN 'u'
         LET _opt_undo = TRUE
-        {
+        { --TODO
+        WHEN 'q'
+          LET _opt_quiet = TRUE
+        WHEN 'L'
+          LET _opt_logfile = opt_arg
         WHEN 'd'
           LET _opt_ext_dir = opt_arg
         }
@@ -212,7 +171,7 @@ PRIVATE FUNCTION parseArgs(argsarr)
     DISPLAY unzipList()
     EXIT PROGRAM 0
   END IF
-  {
+  { --TODO
   IF _opt_in_FGLDIR AND _opt_ext_dir IS NOT NULL THEN
     CALL userError(
         "option --use-FGLDIR(-F) and --destination-dir(-d) are mutually exclusive")
@@ -220,20 +179,7 @@ PRIVATE FUNCTION parseArgs(argsarr)
   }
 END FUNCTION
 
-FUNCTION yesno(message)
-  DEFINE message STRING
-  CALL fgl_setenv("FGLGUI", "0")
-  --RETURN fgl_winButton(title: "fglunzip",message: message,ans: "no",items: "yes|no",icon: "",dang: 0)
-  MENU message
-    COMMAND "yes"
-      RETURN "yes"
-    COMMAND "no"
-      RETURN "no"
-  END MENU
-  RETURN "no"
-END FUNCTION
-
-FUNCTION readFiles()
+PRIVATE FUNCTION readFiles()
   DEFINE raw STRING
   DEFINE tok base.StringTokenizer
   DEFINE path STRING
@@ -255,7 +201,7 @@ FUNCTION readFiles()
 END FUNCTION
 
 --loop thru the path parts
-FUNCTION findFileNode(parent, path, createIfNotFound)
+PRIVATE FUNCTION findFileNode(parent, path, createIfNotFound)
   DEFINE path, part, tName, full STRING
   DEFINE parent, child, newchild om.DomNode
   DEFINE createIfNotFound, found BOOLEAN
@@ -299,7 +245,7 @@ FUNCTION findFileNode(parent, path, createIfNotFound)
   RETURN parent
 END FUNCTION
 
-FUNCTION addFile(parent, path)
+PRIVATE FUNCTION addFile(parent, path)
   DEFINE parent, node om.DomNode
   DEFINE path STRING
   --DISPLAY "addFile:",path
@@ -307,21 +253,21 @@ FUNCTION addFile(parent, path)
   --DISPLAY "added:",node.toString()
 END FUNCTION
 
-FUNCTION fileExists(root, name)
+PRIVATE FUNCTION fileExists(root, name)
   DEFINE root, node om.DomNode
   DEFINE name STRING
   LET node = findFileNode(root, name, FALSE)
   RETURN node IS NOT NULL
 END FUNCTION
 
-FUNCTION isDir(root, name)
+PRIVATE FUNCTION isDir(root, name)
   DEFINE root, node om.DomNode
   DEFINE name STRING
   LET node = findFileNode(root, name, FALSE)
   RETURN node IS NOT NULL AND node.getTagName() == "Dir"
 END FUNCTION
 
-FUNCTION analyze(root)
+PRIVATE FUNCTION analyze(root)
   DEFINE root, child {, lastChild} om.DomNode
   DEFINE numChildren INT
   --DEFINE children DYNAMIC ARRAY OF om.DomNode
@@ -335,7 +281,7 @@ FUNCTION analyze(root)
   RETURN numChildren
 END FUNCTION
 
-FUNCTION doit(root, numChildren)
+PRIVATE FUNCTION doit(root, numChildren)
   DEFINE root om.DomNode
   DEFINE numChildren INT
   DEFINE defRoot STRING
@@ -368,7 +314,7 @@ FUNCTION doit(root, numChildren)
   END IF
 END FUNCTION
 
-FUNCTION unzip(root)
+PRIVATE FUNCTION unzip(root)
   DEFINE root om.DomNode
   DEFINE cmd STRING
   DEFINE code INT
@@ -399,7 +345,7 @@ FUNCTION unzip(root)
   CALL verify(root, os.Path.pwd())
 END FUNCTION
 
-FUNCTION undo(parent, parentDir)
+PRIVATE FUNCTION undo(parent, parentDir)
   DEFINE parent, child om.DomNode
   DEFINE parentDir, path, tag STRING
   LET child = parent.getFirstChild()
@@ -434,7 +380,7 @@ FUNCTION undo(parent, parentDir)
 END FUNCTION
 
 #+check if the unzip command did work
-FUNCTION verify(parent, parentDir)
+PRIVATE FUNCTION verify(parent, parentDir)
   DEFINE parent, child om.DomNode
   DEFINE parentDir, path, tag STRING
   LET child = parent.getFirstChild()
@@ -458,7 +404,7 @@ FUNCTION verify(parent, parentDir)
 END FUNCTION
 
 #+check if the unzip command did work
-FUNCTION simulate(parent, parentDir)
+PRIVATE FUNCTION simulate(parent, parentDir)
   DEFINE parent, child om.DomNode
   DEFINE parentDir, path, tag, marker STRING
   LET child = parent.getFirstChild()
@@ -494,7 +440,7 @@ FUNCTION simulate(parent, parentDir)
   END WHILE
 END FUNCTION
 
-FUNCTION isGBC(root)
+PRIVATE FUNCTION isGBC(root)
   DEFINE root om.DomNode
   RETURN fileExists(root, "VERSION")
       AND fileExists(root, "PRODUCTINFO")
@@ -502,18 +448,18 @@ FUNCTION isGBC(root)
       AND fileExists(root, "js/gbc.js")
 END FUNCTION
 
-FUNCTION myChdir(path)
+PRIVATE FUNCTION myChdir(path)
   DEFINE path STRING
   IF NOT os.Path.chDir(path) THEN
     CALL myErr(SFMT("Can't chdir to:%1", path))
   END IF
 END FUNCTION
 
-FUNCTION getFglDir()
+PRIVATE FUNCTION getFglDir()
   RETURN base.Application.getFglDir()
 END FUNCTION
 
-FUNCTION unzipGBCoverFGLDIR(root)
+PRIVATE FUNCTION unzipGBCoverFGLDIR(root)
   DEFINE root om.DomNode
   DEFINE gbcDir STRING
   LET gbcDir = SFMT("%1/web_utilities/gbc/gbc", getFglDir())
@@ -522,7 +468,7 @@ FUNCTION unzipGBCoverFGLDIR(root)
   CALL unzip(root)
 END FUNCTION
 
-FUNCTION unzipOverFGLDIR(root)
+PRIVATE FUNCTION unzipOverFGLDIR(root)
   DEFINE root om.DomNode
   IF isGBC(root) THEN
     CALL unzipGBCoverFGLDIR(root)
@@ -532,7 +478,7 @@ FUNCTION unzipOverFGLDIR(root)
   END IF
 END FUNCTION
 
-FUNCTION generateUndoScript(root)
+PRIVATE FUNCTION generateUndoScript(root)
   DEFINE root om.DomNode
   DEFINE ch_sh, ch_bat base.Channel
   DEFINE name_sh, name_bat STRING
@@ -552,7 +498,7 @@ FUNCTION generateUndoScript(root)
   MYASSERT(os.Path.chRwx(name_sh, 484) == TRUE) --u+x
 END FUNCTION
 
-FUNCTION add_rm(parent, parentDir, ch_sh, ch_bat)
+PRIVATE FUNCTION add_rm(parent, parentDir, ch_sh, ch_bat)
   DEFINE parent, child om.DomNode
   DEFINE parentDir, path, winpath STRING
   DEFINE ch_sh, ch_bat base.Channel
@@ -578,7 +524,7 @@ FUNCTION add_rm(parent, parentDir, ch_sh, ch_bat)
 END FUNCTION
 
 #+ for zip archives not having a single root we create a root dir named after the product file name (similar to what desktop extraction tools do)
-FUNCTION computeDefName()
+PRIVATE FUNCTION computeDefName()
   DEFINE def, b STRING
   DEFINE idx1, idx2 INT
   LET b = os.Path.baseName(_product_zip)
@@ -588,8 +534,313 @@ FUNCTION computeDefName()
     LET idx2 = b.getIndexOf("-", idx1 + 1)
     LET def = b.subString(5, idx2 - 1)
   ELSE
-    LET def = cutExtension(b)
+    LET def = removeExtension(b)
   END IF
-  DISPLAY "defname:", def
+  --DISPLAY "defname:", def
   RETURN def
 END FUNCTION
+
+--utils
+
+PRIVATE FUNCTION isWin() RETURNS BOOLEAN
+  RETURN os.Path.separator().equals("\\")
+END FUNCTION
+
+PRIVATE FUNCTION printStderr(errstr STRING)
+  DEFINE ch base.Channel
+  LET ch = base.Channel.create()
+  CALL ch.openFile("<stderr>", "w")
+  CALL ch.writeLine(errstr)
+  CALL ch.close()
+END FUNCTION
+{
+PRIVATE FUNCTION printStdout(str STRING, noNewLine BOOLEAN)
+  IF noNewLine THEN
+    LET _stdoutNONL = _stdoutNONL, str
+  ELSE
+    LET str = _stdoutNONL, str
+    LET _stdoutNONL = ""
+    DISPLAY str
+  END IF
+END FUNCTION
+}
+
+PRIVATE FUNCTION myErr(errstr STRING)
+  CALL printStderr(
+      SFMT("ERROR:%1 stack:\n%2", errstr, base.Application.getStackTrace()))
+  EXIT PROGRAM 1
+END FUNCTION
+{
+PRIVATE FUNCTION myWarning(errstr STRING)
+  CALL printStderr(SFMT("Warning %1:%2", progName(), errstr))
+END FUNCTION
+
+PRIVATE FUNCTION log(msg STRING)
+  IF fgl_getenv("VERBOSE") IS NOT NULL THEN
+    DISPLAY "log:", msg
+  END IF
+END FUNCTION
+
+--for dev: replace log() with dlog() for simply write to stdout
+PRIVATE FUNCTION dlog(s STRING)
+  DISPLAY s
+END FUNCTION
+}
+
+PRIVATE FUNCTION already_quoted(path) RETURNS BOOLEAN
+  DEFINE path, first, last STRING
+  LET first = NVL(path.getCharAt(1), "NULL")
+  LET last = NVL(path.getCharAt(path.getLength()), "NULL")
+  IF isWin() THEN
+    RETURN (first == '"' AND last == '"')
+  END IF
+  RETURN (first == "'" AND last == "'") OR (first == '"' AND last == '"')
+END FUNCTION
+
+PRIVATE FUNCTION quote(path STRING) RETURNS STRING
+  RETURN quoteInt(path, FALSE)
+END FUNCTION
+
+PRIVATE FUNCTION quoteForce(path STRING) RETURNS STRING
+  RETURN quoteInt(path, TRUE)
+END FUNCTION
+
+PRIVATE FUNCTION quoteInt(path STRING, force BOOLEAN) RETURNS STRING
+  IF force OR path.getIndexOf(" ", 1) > 0 THEN
+    IF NOT already_quoted(path) THEN
+      LET path = '"', path, '"'
+    END IF
+  ELSE
+    IF already_quoted(path) AND isWin() THEN --remove quotes(Windows)
+      LET path = path.subString(2, path.getLength() - 1)
+    END IF
+  END IF
+  RETURN path
+END FUNCTION
+
+PRIVATE FUNCTION replace(
+    src STRING, oldStr STRING, newString STRING)
+    RETURNS STRING
+  DEFINE b base.StringBuffer
+  LET b = base.StringBuffer.create()
+  CALL b.append(src)
+  CALL b.replace(oldStr, newString, 0)
+  RETURN b.toString()
+END FUNCTION
+
+PRIVATE FUNCTION backslash2slash(src STRING) RETURNS STRING
+  RETURN replace(src, "\\", "/")
+END FUNCTION
+
+#+case insensitive variant of getIndexOf
+PRIVATE FUNCTION getIndexOfI(src, pattern, idx) RETURNS INT
+  DEFINE src, pattern STRING
+  DEFINE idx INTEGER
+  LET src = src.toLowerCase()
+  RETURN src.getIndexOf(pattern.toLowerCase(), idx)
+END FUNCTION
+
+PRIVATE FUNCTION getProgramOutputWithErr(cmd STRING) RETURNS(STRING, STRING)
+  DEFINE cmdOrig, tmpName, errStr STRING
+  DEFINE txt TEXT
+  DEFINE ret STRING
+  DEFINE code INT
+  LET cmdOrig = cmd
+  LET tmpName = makeTempName()
+  LET cmd = cmd, ">", tmpName, " 2>&1"
+  --CALL log(sfmt("run:%1", cmd))
+  RUN cmd RETURNING code
+  LOCATE txt IN FILE tmpName
+  LET ret = txt
+  CALL os.Path.delete(tmpName) RETURNING status
+  IF code THEN
+    LET errStr = ",\n  output:", ret
+    CALL os.Path.delete(tmpName) RETURNING code
+  ELSE
+    --remove \r\n
+    IF ret.getCharAt(ret.getLength()) == "\n" THEN
+      LET ret = ret.subString(1, ret.getLength() - 1)
+    END IF
+    IF ret.getCharAt(ret.getLength()) == "\r" THEN
+      LET ret = ret.subString(1, ret.getLength() - 1)
+    END IF
+  END IF
+  RETURN ret, errStr
+END FUNCTION
+
+PRIVATE FUNCTION getProgramOutput(cmd STRING) RETURNS STRING
+  DEFINE result, err STRING
+  CALL getProgramOutputWithErr(cmd) RETURNING result, err
+  IF err IS NOT NULL THEN
+    CALL myErr(SFMT("failed to RUN:%1%2", cmd, err))
+  END IF
+  RETURN result
+END FUNCTION
+
+#+computes a temporary file name
+PRIVATE FUNCTION makeTempName() RETURNS STRING
+  DEFINE tmpDir, tmpName, sbase, curr STRING
+  DEFINE sb base.StringBuffer
+  DEFINE i INT
+  IF isWin() THEN
+    LET tmpDir = fgl_getenv("TEMP")
+  ELSE
+    LET tmpDir = "/tmp"
+  END IF
+  LET curr = CURRENT
+  LET sb = base.StringBuffer.create()
+  CALL sb.append(curr)
+  CALL sb.replace(" ", "_", 0)
+  CALL sb.replace(":", "_", 0)
+  CALL sb.replace(".", "_", 0)
+  CALL sb.replace("-", "_", 0)
+  LET sbase = SFMT("fgl_%1_%2", fgl_getpid(), sb.toString())
+  LET sbase = os.Path.join(tmpDir, sbase)
+  FOR i = 1 TO 10000
+    LET tmpName = SFMT("%1%2.tmp", sbase, i)
+    IF NOT os.Path.exists(tmpName) THEN
+      RETURN tmpName
+    END IF
+  END FOR
+  CALL myErr("makeTempName:Can't allocate a unique name")
+  RETURN NULL
+END FUNCTION
+
+-- returns
+-- -<count>-g<SHA> for a non release
+-- -<SHA> for a release (GIT_COMMIT_COUNT==0)
+PRIVATE FUNCTION adjustGitCountAndRev(cnt INT, rev STRING)
+  --don't display 0 and g in the revision for official releases
+  VAR countInfo = IIF(cnt == 0, "", SFMT("-%1", cnt))
+  LET rev = IIF(cnt == 0, rev.subString(2, rev.getLength()), rev)
+  VAR ret = SFMT("%1-%2", countInfo, rev)
+  VAR warn
+      = IIF(cnt == 0,
+          "",
+          " (nightly build - not suitable for production purposes)")
+  LET ret = SFMT("%1%2", ret, warn)
+  RETURN ret
+END FUNCTION
+
+PRIVATE FUNCTION removeExtension(fname STRING) RETURNS STRING
+  VAR ext = os.Path.extension(fname)
+  IF ext.getLength() > 0 THEN
+    LET fname = fname.subString(1, fname.getLength() - (ext.getLength() + 1))
+  END IF
+  RETURN fname
+END FUNCTION
+
+PRIVATE FUNCTION printVersion()
+  VAR prog = removeExtension(os.Path.baseName(arg_val(0)))
+  DISPLAY SFMT("%1 %2 rev%3",
+      prog, GIT_VERSION, adjustGitCountAndRev(GIT_COMMIT_COUNT, GIT_REV))
+  EXIT PROGRAM 0
+END FUNCTION
+
+PRIVATE FUNCTION isLetter(c STRING)
+  VAR letters = "abcdefghijklmnopqrstuvwxyz"
+  RETURN getIndexOfI(src: letters, pattern: c, idx: 1) > 0
+END FUNCTION
+
+PRIVATE FUNCTION isWinDriveInt(path STRING)
+  RETURN isWin()
+      AND path.getCharAt(2) == ":"
+      AND (path.getCharAt(3) == "\\" OR path.getCharAt(3) == "/")
+      AND isLetter(path.getCharAt(1))
+END FUNCTION
+{
+PRIVATE FUNCTION isWinDriveRoot(path STRING)
+  RETURN path.getLength() == 3 AND isWinDriveInt(path)
+END FUNCTION
+}
+
+PRIVATE FUNCTION pathStartsWithWinDrive(path STRING)
+  RETURN path.getLength() >= 3 AND isWinDriveInt(path)
+END FUNCTION
+
+#creates a directory path recursively like mkdir -p
+PRIVATE FUNCTION mkdirp(path STRING)
+  VAR winbase = FALSE
+  VAR level = 0
+  IF isWin() AND path.getIndexOf("\\", 1) > 0 THEN
+    LET path = backslash2slash(path)
+  END IF
+  VAR basedir = "."
+  CASE
+    WHEN path.getCharAt(1) == "/"
+      LET basedir = "/"
+      --check for driveletter: as path start
+    WHEN pathStartsWithWinDrive(path)
+      LET basedir = path.subString(1, 2)
+      --DISPLAY "winbase:",basedir
+      LET winbase = TRUE
+  END CASE
+  VAR tok = base.StringTokenizer.create(path, "/")
+  VAR part = basedir
+  WHILE tok.hasMoreTokens()
+    LET level = level + 1
+    VAR next = tok.nextToken()
+    --DISPLAY "part0:",part,",next:",next
+    IF level == 1 AND winbase THEN
+      MYASSERT(basedir == next)
+      --DISPLAY "next level"
+      CONTINUE WHILE
+    END IF
+    LET part = os.Path.join(part, next)
+    --DISPLAY "part1:",part
+    IF NOT os.Path.exists(part) THEN
+      IF NOT os.Path.mkdir(part) THEN
+        CALL myErr(SFMT("can't create directory:%1", part))
+        {ELSE
+          DISPLAY "did mkdir:", part}
+      END IF
+    ELSE
+      IF NOT os.Path.isDirectory(part) THEN
+        CALL myErr(SFMT("mkdirp: sub path:'%1' is not a directory", part))
+        {ELSE
+          DISPLAY "part next:", part, " is a dir"}
+      END IF
+    END IF
+  END WHILE
+END FUNCTION
+
+PRIVATE FUNCTION progName() RETURNS STRING
+  VAR ret = os.Path.baseName(arg_val(0))
+  VAR ext = os.Path.extension(ret)
+  IF ext.getLength() > 0 THEN
+    LET ret = ret.subString(1, ret.getLength() - ext.getLength() - 1)
+  END IF
+  RETURN ret
+END FUNCTION
+
+PRIVATE FUNCTION userError(err STRING)
+  CALL printStderr(SFMT("Error %1:%2", progName(), err))
+  EXIT PROGRAM 1
+END FUNCTION
+
+PRIVATE FUNCTION whichExe(prog STRING) RETURNS STRING
+  DEFINE exe, err, cmd STRING
+  LET cmd = IIF(isWin(), "where", "which")
+  CALL getProgramOutputWithErr(SFMT("%1 %2", cmd, quote(prog)))
+      RETURNING exe, err
+  IF err IS NOT NULL THEN
+    --DISPLAY SFMT("which error for '%1':%2", prog, err)
+    RETURN NULL
+  END IF
+  RETURN exe
+END FUNCTION
+
+{
+PRIVATE FUNCTION yesno(message)
+  DEFINE message STRING
+  CALL fgl_setenv("FGLGUI", "0")
+  --RETURN fgl_winButton(title: "fglunzip",message: message,ans: "no",items: "yes|no",icon: "",dang: 0)
+  MENU message
+    COMMAND "yes"
+      RETURN "yes"
+    COMMAND "no"
+      RETURN "no"
+  END MENU
+  RETURN "no"
+END FUNCTION
+}

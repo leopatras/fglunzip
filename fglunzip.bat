@@ -20,11 +20,9 @@ IF %errorlevel% NEQ 0 GOTO myend
 fglrun checkgit %GIT_LONG_VERSION%
 IF %errorlevel% NEQ 0 GOTO myend
 REM uses inc file
-CALL fglcomp -M -r -Wall futils
+CALL fglcomp -M -r -Wall fglunzip
 IF %errorlevel% NEQ 0 GOTO myend
 CALL myfglcomp mygetopt
-IF %errorlevel% NEQ 0 GOTO myend
-CALL myfglcomp fglunzip
 IF %errorlevel% NEQ 0 GOTO myend
 popd
 %MYDRIVE%
