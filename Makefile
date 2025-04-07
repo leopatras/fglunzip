@@ -2,6 +2,7 @@ ifdef windir
 WINDIR=$(windir)
 endif
 
+
 ifdef WINDIR
   FGLRUN=fglrun.exe
 export LANG=.utf8
@@ -9,6 +10,11 @@ export LANG=.utf8
 define _env
 set $(1)=$(2)&&
 endef
+SHELL=cmd.exe
+RM_F=del /s /q
+RM_RF=rmdir /s /q
+STD_DEV_NULL= >NUL
+ERR_DEV_NULL= 2>NUL
 
 else
   FGLRUN=fglrun
@@ -17,18 +23,16 @@ export LC_ALL=en_US.UTF-8
 define _env
 export $(1)=$(2)&&
 endef
+RM_F=rm -f
+RM_RF=rm -rf
 
-endif
-#check if we have a runtime supporting binary copyN
-ifneq ($(wildcard $(FGLDIR)/lib/WSHelper.42m),)
-  COMFLAGS= -D HAVE_COM
 endif
 
 %.42f: %.per 
 	fglform -M $<
 
 %.42m: %.4gl 
-	fglcomp -M $(FGLFLAGS) $(COMFLAGS) -r -Wall -Wno-stdsql $*
+	fglcomp -M $(FGLFLAGS) -r -Wall -Wno-stdsql $*
 
 
 MODS=$(patsubst %.4gl,%.42m,$(wildcard *.4gl))
@@ -57,7 +61,8 @@ format:
 	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace mygetopt.4gl
 
 clean:
-	rm -f *.42? fglunzip_version.inc
+	-$(RM_F) *.42? fglunzip_version.inc $(STD_DEV_NULL) $(ERR_DEV_NULL)
+
 
 format-clean: clean
-	rm *.4gl~
+	-$(RM_F) *.4gl~ $(STD_DEV_NULL) $(ERR_DEV_NULL)
