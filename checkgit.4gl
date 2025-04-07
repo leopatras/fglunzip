@@ -8,7 +8,7 @@ DEFINE git_fgl_commit_count STRING
 DEFINE git_fgl_rev STRING
 MAIN
   DEFINE verbose BOOLEAN
-  LET verbose=fgl_getenv("VERBOSE") IS NOT NULL
+  LET verbose = fgl_getenv("VERBOSE") IS NOT NULL
   CALL parseVersion(arg_val(1), FALSE)
   VAR versionContent = SFMT("%1", formatContent())
   IF NOT os.Path.exists(FGLUTILS_VERSION_INC) THEN
@@ -20,7 +20,9 @@ MAIN
     VAR prevContent = readTextFile(FGLUTILS_VERSION_INC)
     IF NOT versionContent.equals(prevContent) THEN
       IF verbose THEN
-        DISPLAY FGLUTILS_VERSION_INC, " overwrite with new version:\n", versionContent
+        DISPLAY FGLUTILS_VERSION_INC,
+            " overwrite with new version:\n",
+            versionContent
       END IF
       CALL writeStringToFile(FGLUTILS_VERSION_INC, versionContent)
     ELSE
@@ -32,8 +34,8 @@ MAIN
 END MAIN
 
 FUNCTION isNumber(c STRING)
-  VAR numbers="0123456789"
-  RETURN numbers.getIndexOf(c,1)<>0
+  VAR numbers = "0123456789"
+  RETURN numbers.getIndexOf(c, 1) <> 0
 END FUNCTION
 
 FUNCTION parseVersion(longver STRING, fgl BOOLEAN)

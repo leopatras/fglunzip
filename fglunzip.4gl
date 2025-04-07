@@ -48,14 +48,15 @@ MAIN
 END MAIN
 
 FUNCTION tarExe()
-  RETURN IIF(isWin(),"tar.exe","tar")
+  RETURN IIF(isWin(), "tar.exe", "tar")
 END FUNCTION
 
 FUNCTION checkTar()
   DEFINE tar STRING
-  LET tar=tarExe()
+  LET tar = tarExe()
   IF whichExe(tar) IS NULL THEN
-    CALL userError(sfmt("Couldn't find program:%1 on your system, please install",tar))
+    CALL userError(
+        SFMT("Couldn't find program:%1 on your system, please install", tar))
   END IF
 END FUNCTION
 
@@ -176,19 +177,19 @@ PRIVATE FUNCTION parseArgs(argsarr)
         EXIT PROGRAM 0
       WHEN 'v'
         LET _opt_verbose = TRUE
-      {
-      WHEN 'q'
-        LET _opt_quiet = TRUE
-      }
+        {
+        WHEN 'q'
+          LET _opt_quiet = TRUE
+        }
       WHEN 'h'
         CALL mygetopt.displayUsage(gr, "fjs-<product>.zip")
         EXIT PROGRAM 0
       WHEN 'l'
         LET listSeen = TRUE
-      {
-      WHEN 'L'
-        LET _opt_logfile = opt_arg
-      }
+        {
+        WHEN 'L'
+          LET _opt_logfile = opt_arg
+        }
       WHEN 'F'
         LET _opt_in_FGLDIR = TRUE
       WHEN 's'
@@ -423,7 +424,7 @@ FUNCTION undo(parent, parentDir)
           DISPLAY "Could not delete dir:", path, ",probably not empty"
         ELSE
           IF _opt_verbose THEN
-            DISPLAY "deleted dir:", path,"/"
+            DISPLAY "deleted dir:", path, "/"
           END IF
         END IF
       END IF
