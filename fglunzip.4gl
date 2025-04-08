@@ -9,6 +9,7 @@ DEFINE _opt_verbose BOOLEAN
 DEFINE _opt_in_FGLDIR BOOLEAN
 DEFINE _opt_simulate BOOLEAN
 DEFINE _opt_undo BOOLEAN
+DEFINE _opt_plain BOOLEAN
 --DEFINE _stdoutNONL STRING
 --TODO
 --DEFINE _opt_quiet BOOLEAN
@@ -18,6 +19,9 @@ MAIN
   DEFINE argsarr DYNAMIC ARRAY OF STRING
   DEFINE root om.DomNode
   DEFINE numChildren INT
+  IF yesno_mode() THEN
+    RETURN
+  END IF
   CALL checkTar()
   LET argsarr = setupArgs()
   --DISPLAY "argsarr:",util.JSON.stringify(argsarr)
@@ -87,7 +91,7 @@ PRIVATE FUNCTION parseArgs(argsarr)
 
   LET i = o.getLength() + 1
   LET o[i].name = "simulate"
-  LET o[i].description = "simulates what would be extracted/deleted"
+  LET o[i].description = "simulates what would be extracted/undone"
   LET o[i].opt_char = "s"
   LET o[i].arg_type = mygetopt.NONE
 
@@ -102,6 +106,19 @@ PRIVATE FUNCTION parseArgs(argsarr)
   LET o[i].description =
       "installs over FGLDIR to make the product avaiable without further env settings"
   LET o[i].opt_char = "F"
+  LET o[i].arg_type = mygetopt.NONE
+
+  LET i = o.getLength() + 1
+  LET o[i].name = "like-unzip"
+  LET o[i].description =
+      "extracts multiple files/directories in the root directory of the archive like unzip 'plain' in the current directory"
+  LET o[i].opt_char = "i"
+  LET o[i].arg_type = mygetopt.NONE
+
+  LET i = o.getLength() + 1
+  LET o[i].name = "undo"
+  LET o[i].description = "Reverts the install"
+  LET o[i].opt_char = "u"
   LET o[i].arg_type = mygetopt.NONE
 
   { --TODO
@@ -125,12 +142,6 @@ PRIVATE FUNCTION parseArgs(argsarr)
   LET o[i].arg_type = mygetopt.NONE
   }
 
-  LET i = o.getLength() + 1
-  LET o[i].name = "undo"
-  LET o[i].description = "Reverts the install"
-  LET o[i].opt_char = "u"
-  LET o[i].arg_type = mygetopt.NONE
-
   CALL mygetopt.initialize(gr, "fglunzip", argsarr, o)
   WHILE mygetopt.getopt(gr) == mygetopt.SUCCESS
     LET opt_arg = mygetopt.opt_arg(gr)
@@ -151,6 +162,8 @@ PRIVATE FUNCTION parseArgs(argsarr)
         LET _opt_simulate = TRUE
       WHEN 'u'
         LET _opt_undo = TRUE
+      WHEN 'i'
+        LET _opt_plain = TRUE
         { --TODO
         WHEN 'q'
           LET _opt_quiet = TRUE
@@ -278,7 +291,13 @@ PRIVATE FUNCTION analyze(root)
     --LET lastChild = child
     LET child = child.getNext()
   END WHILE
+  CALL root.setAttribute("numChildren", numChildren)
   RETURN numChildren
+END FUNCTION
+
+PRIVATE FUNCTION getNumChildren(root)
+  DEFINE root om.DomNode
+  RETURN root.getAttribute("numChildren")
 END FUNCTION
 
 PRIVATE FUNCTION doit(root, numChildren)
@@ -301,14 +320,20 @@ PRIVATE FUNCTION doit(root, numChildren)
     IF _opt_in_FGLDIR THEN
       CALL unzipOverFGLDIR(root)
     ELSE
-      LET defRoot = computeDefName()
-      IF NOT os.Path.exists(defRoot) THEN
-        CALL mkdirp(defRoot)
-        IF _opt_verbose THEN
-          DISPLAY "created extraction root:", os.Path.fullPath(defRoot)
+      IF NOT _opt_plain THEN --by default create a single root directory to avoid cluttering the current directory with multiple files and extract the zip beneath that single root directory
+        LET defRoot = computeDefName()
+        IF NOT os.Path.exists(defRoot) THEN
+          CALL mkdirp(defRoot)
+          IF _opt_verbose THEN
+            DISPLAY "created extraction root:", os.Path.fullPath(defRoot)
+          END IF
+        END IF
+        MYASSERT(os.Path.chDir(defRoot) == TRUE)
+      ELSE
+        IF NOT _opt_simulate AND NOT _opt_undo THEN
+          CALL checkFilesExisting(root)
         END IF
       END IF
-      MYASSERT(os.Path.chDir(defRoot) == TRUE)
       CALL unzip(root)
     END IF
   END IF
@@ -438,6 +463,34 @@ PRIVATE FUNCTION simulate(parent, parentDir)
     CALL simulate(child, path)
     LET child = child.getNext()
   END WHILE
+END FUNCTION
+
+PRIVATE FUNCTION checkFilesExisting(root)
+  DEFINE root om.DomNode
+  DEFINE dh INT
+  DEFINE fname, ans STRING
+  DEFINE foundEntries INT
+  LET dh = os.Path.dirOpen(os.Path.pwd())
+  IF dh == 0 THEN
+    CALL userError(SFMT("Can't open directory '%1'", os.Path.pwd()))
+  END IF
+  WHILE (fname := os.Path.dirNext(dh)) IS NOT NULL
+    IF fname == "." OR fname == ".." THEN
+      CONTINUE WHILE
+    END IF
+    LET foundEntries = foundEntries + 1
+  END WHILE
+  CALL os.Path.dirClose(dh)
+  IF foundEntries > 0 THEN
+    LET ans =
+        yesno(
+            SFMT("There are already %1 files, folders or links in this directory...\nContinue extracting %2 files ?",
+                foundEntries, getNumChildren(root)))
+    --DISPLAY "ans:",ans
+    IF NOT ans.equals("yes") THEN
+      EXIT PROGRAM 1
+    END IF
+  END IF
 END FUNCTION
 
 PRIVATE FUNCTION isGBC(root)
@@ -654,7 +707,7 @@ PRIVATE FUNCTION getProgramOutputWithErr(cmd STRING) RETURNS(STRING, STRING)
   LET ret = txt
   CALL os.Path.delete(tmpName) RETURNING status
   IF code THEN
-    LET errStr = ",\n  output:", ret
+    LET errStr = ",\noutput:", ret
     CALL os.Path.delete(tmpName) RETURNING code
   ELSE
     --remove \r\n
@@ -672,7 +725,7 @@ PRIVATE FUNCTION getProgramOutput(cmd STRING) RETURNS STRING
   DEFINE result, err STRING
   CALL getProgramOutputWithErr(cmd) RETURNING result, err
   IF err IS NOT NULL THEN
-    CALL myErr(SFMT("failed to RUN:%1%2", cmd, err))
+    CALL userError(SFMT("failed to RUN:%1%2", cmd, err))
   END IF
   RETURN result
 END FUNCTION
@@ -830,17 +883,108 @@ PRIVATE FUNCTION whichExe(prog STRING) RETURNS STRING
   RETURN exe
 END FUNCTION
 
-{
+PRIVATE FUNCTION fullfglrunEXE()
+  RETURN os.Path.join(
+      os.Path.join(base.Application.getFglDir(), "bin"),
+      SFMT("fglrun%1", IIF(isWin(), ".exe", "")))
+END FUNCTION
+
+PRIVATE FUNCTION fullProgName()
+  RETURN os.Path.join(
+      base.Application.getProgramDir(), os.Path.baseName(arg_val(0)))
+END FUNCTION
+
+PRIVATE FUNCTION writeStringToFile(file STRING, content STRING)
+  DEFINE ch base.Channel
+  LET ch = base.Channel.create()
+  CALL ch.openFile(file, "w")
+  CALL ch.writeNoNL(content)
+  CALL ch.close()
+END FUNCTION
+
+FUNCTION readTextFile(filename) RETURNS STRING
+  DEFINE filename STRING
+  DEFINE content STRING
+  DEFINE t TEXT
+  LOCATE t IN FILE filename
+  LET content = t
+  RETURN content
+END FUNCTION
+
+FUNCTION yesno_mode()
+  DEFINE yesno_msg STRING
+  LET yesno_msg = fgl_getenv("__FGL_UNZIP_YESNO_MESSAGE__")
+  IF yesno_msg IS NOT NULL THEN --we did invoke us for yesno
+    CALL yesno(yesno_msg) RETURNING status
+    RETURN TRUE
+  END IF
+  RETURN FALSE
+END FUNCTION
+
+PRIVATE FUNCTION yesno_cmd(message)
+  DEFINE message STRING
+  DEFINE cmd, ans, resfile STRING
+  DEFINE code INT
+  CALL fgl_setenv("FGLGUI", "0")
+  CALL fgl_setenv("__FGL_UNZIP_YESNO_MESSAGE__", message)
+  LET resfile = makeTempName()
+  CALL fgl_setenv("__FGL_UNZIP_RESULT_FILE__", resfile)
+  LET cmd = SFMT("%1 %2", quote(fullfglrunEXE()), quote(fullProgName()))
+  --DISPLAY "cmd:",cmd
+  RUN cmd RETURNING code
+  IF code THEN
+    LET ans = "failed"
+  ELSE
+    LET ans = readTextFile(resfile)
+  END IF
+  CALL os.Path.delete(resfile) RETURNING status
+  RETURN ans
+END FUNCTION
+
+--displays a multiline message in a temp .42f
+--and calls a MENU with yes no
 PRIVATE FUNCTION yesno(message)
   DEFINE message STRING
-  CALL fgl_setenv("FGLGUI", "0")
-  --RETURN fgl_winButton(title: "fglunzip",message: message,ans: "no",items: "yes|no",icon: "",dang: 0)
-  MENU message
+  DEFINE fglgui, ans, resfile, frmfile STRING
+  LET fglgui = fgl_getenv("FGLGUI")
+  IF NOT fglgui.equals("0") THEN --run sub process
+    RETURN yesno_cmd(message)
+  END IF
+  LET resfile = fgl_getenv("__FGL_UNZIP_RESULT_FILE__")
+  LET frmfile = makeTempName(), ".42f"
+  CALL writeStringToFile(frmfile, fglunzip_42f())
+  OPTIONS MENU LINE 5
+  OPTIONS COMMENT LINE 6
+  OPEN FORM f FROM frmfile
+  DISPLAY FORM f
+  CALL os.Path.delete(frmfile) RETURNING status
+  DISPLAY message TO msg
+  MENU " Please answer"
     COMMAND "yes"
-      RETURN "yes"
+      LET ans = "yes"
+      EXIT MENU
     COMMAND "no"
-      RETURN "no"
+      LET ans = "no"
+      EXIT MENU
   END MENU
-  RETURN "no"
+  IF resfile IS NOT NULL THEN
+    CALL writeStringToFile(resfile, content: ans)
+  END IF
+  RETURN ans
 END FUNCTION
-}
+
+--returns fglunzip.per ready compiled
+FUNCTION fglunzip_42f()
+  RETURN '<?xml version=\'1.0\' encoding=\'UTF-8\'?>\n<Form name="fglunzip" build="5.01.02" width="80" height="2" delimiters="">\n<Screen width="80" height="2">\n<FormField name="formonly.msg" colName="msg" fieldId="0" sqlTabName="formonly" tabIndex="1">\n<TextEdit wantReturns="1" scrollBars="none" scroll="0" height="2" width="78" posY="0" posX="1" gridWidth="78" gridHeight="2"/>\n</FormField>\n</Screen>\n<RecordView tabName="formonly">\n<Link colName="msg" fieldIdRef="0"/>\n</RecordView>\n</Form>'
+END FUNCTION
+--SCREEN
+--{
+--[msg                                                                           ]
+--[msg                                                                           ]
+--}
+--END
+--ATTRIBUTES
+
+--msg=FORMONLY.msg,WORDWRAP;
+--INSTRUCTIONS
+--DELIMITERS "";

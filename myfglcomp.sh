@@ -21,7 +21,7 @@ myfglcomp() {
     fi
   fi
   if [ $compile -eq 1 ]; then
-    echo "compile $src, $reason."
+#    echo "compile $src, $reason."
     fglcomp -M -Wall -r $src
     if [ $? -ne 0 ]; then
       exit 1
