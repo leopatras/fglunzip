@@ -15,6 +15,7 @@ RM_F=del /s /q
 RM_RF=rmdir /s /q
 STD_DEV_NULL= >NUL
 ERR_DEV_NULL= 2>NUL
+SLASH=$(strip \)
 
 else
   FGLRUN=fglrun
@@ -25,6 +26,7 @@ export $(1)=$(2)&&
 endef
 RM_F=rm -f
 RM_RF=rm -rf
+SLASH=/
 
 endif
 
@@ -50,6 +52,14 @@ fglunzip.42m: fglunzip_version.inc
 echo:
 	echo "MODS: $(MODS), GIT_LONG_VERSION: $(GIT_LONG_VERSION)"
 
+fglscriptify:
+	git clone https://github.com/leopatras/fglscriptify.git
+
+#bundles fglunzip as a single shell/bat script
+dist: all fglscriptify
+	fglscriptify$(SLASH)fglscriptify -o dist$(SLASH)fglunzip fglunzip_version.inc myassert.inc mygetopt.4gl fglunzip.4gl
+	fglscriptify$(SLASH)fglscriptify -o dist$(SLASH)fglunzip.bat fglunzip_version.inc myassert.inc mygetopt.4gl fglunzip.4gl
+
 format:
 	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace fglunzip.4gl
 	fglcomp -M $(FGLFLAGS) $(COMFLAGS) --format --fo-inplace checkgit.4gl
@@ -61,3 +71,6 @@ clean:
 
 format-clean: clean
 	-$(RM_F) *.4gl~ $(STD_DEV_NULL) $(ERR_DEV_NULL)
+
+dist-clean: format-clean 
+	-$(RM_RF) fglscriptify
