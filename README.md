@@ -28,7 +28,7 @@ C:> <path_to_this_repository>\fglunzip ?options? fjs-<product>.zip
 or extend `PATH` to include this repository.
 
 Furthermore you can download fglunzip as a single self extracting/self compiling shell script: [fglunzip](dist/fglunzip?raw=1)(Download Linked file As...)
-or download as self extracting/self compiling batch file for Windows:[fglunzip.bat](dist/fglunzip.bat)(Download Linked file As...).
+or download as self extracting/self compiling batch file for Windows:[fglunzip.bat](dist/fglunzip.bat)(Download Linked file As...). You should place it in your `$HOME/bin` or `$FGLDIR/bin` (somewhere in your `PATH`).
 
 Both files were produced using the [fglscriptify](https://github.com/leopatras/fglscriptify) Genero tool.
 
