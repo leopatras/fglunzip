@@ -6,11 +6,11 @@ standard unzip does clutter the current directory with several directories/files
 For the novice/unexperienced command line user it is hard to clean up, there is no undo command in standard unzip for that.
 
 fglunzip has the following features
-1. creates by default a single root directory in the current directory by default if there is no single root in the zip. The single root directory is based on the zip file name. This is similar to what windows explorer does but in a smarter way: 
+1. creates by default a single root directory in the current directory if there is no single root in the zip. The single root directory is based on the zip file name. This is similar to what windows explorer does but in a smarter way: 
 If there is already a single root directory in the zip file: no additional root directory is created by fglunzip.
-2. has a --undo(-u) command line switch to revert the extraction
-3. has a --simulate(-s) command line switch to dry run the extraction/undo
-4. has a --use-FGLDIR(-F) switch to install packages *without* a single root directory and are intended/reported to work inside FGLDIR (such as GMI and GWA and the GBC runtime package)
+2. has a `--undo` (`-u`) command line switch to revert the extraction
+3. has a `--simulate` (`-s`) command line switch to dry run the extraction/undo
+4. has a `--use-FGLDIR`(`-F`) switch to install packages *without* a single root directory and which are intended/reported to work inside FGLDIR (such as GMI and GWA and the GBC runtime package)
 
 # Installation
 
@@ -26,6 +26,7 @@ C:> <path_to_this_repository>\fglunzip ?options? fjs-<product>.zip
 ```
 
 or add PATH to include this repository.
+
 
 # Options
 ```
