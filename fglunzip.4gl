@@ -8,30 +8,35 @@ DEFINE _product_zip STRING --the zip file to process
 DEFINE _opt_verbose BOOLEAN
 DEFINE _opt_in_FGLDIR BOOLEAN
 DEFINE _opt_simulate BOOLEAN
+DEFINE _opt_overwrite BOOLEAN
 DEFINE _opt_undo BOOLEAN
 DEFINE _opt_plain BOOLEAN
+DEFINE _pwd STRING
+DEFINE _fgldir STRING
 --DEFINE _stdoutNONL STRING
 --TODO
---DEFINE _opt_quiet BOOLEAN
+DEFINE _opt_quiet BOOLEAN
 --DEFINE _opt_logfile STRING
 --DEFINE _opt_ext_dir STRING
 MAIN
   DEFINE argsarr DYNAMIC ARRAY OF STRING
   DEFINE root om.DomNode
-  DEFINE numChildren INT
+  DEFINE numChildren, numFiles, numDirs INT
   IF yesno_mode() THEN
     RETURN
   END IF
+  LET _pwd = os.Path.pwd()
+  LET _fgldir = os.Path.fullPath(base.Application.getFglDir())
   CALL checkTar()
   LET argsarr = setupArgs()
   --DISPLAY "argsarr:",util.JSON.stringify(argsarr)
   CALL parseArgs(argsarr)
   LET root = readFiles()
-  LET numChildren = analyze(root)
+  CALL analyze(root, FALSE) RETURNING numChildren, numFiles, numDirs
   IF numChildren == 0 THEN
     CALL userError(SFMT("no entries found in:%1", _product_zip))
   END IF
-  CALL doit(root, numChildren)
+  CALL doit(root, numChildren, numDirs, numFiles)
 END MAIN
 
 FUNCTION tarExe()
@@ -73,7 +78,7 @@ PRIVATE FUNCTION parseArgs(argsarr)
 
   LET i = o.getLength() + 1
   LET o[i].name = "version"
-  LET o[i].description = "Version information"
+  LET o[i].description = "version information"
   LET o[i].opt_char = "V"
   LET o[i].arg_type = mygetopt.NONE
 
@@ -91,13 +96,13 @@ PRIVATE FUNCTION parseArgs(argsarr)
 
   LET i = o.getLength() + 1
   LET o[i].name = "simulate"
-  LET o[i].description = "simulates what would be extracted/undone"
+  LET o[i].description = "simulates what would be extracted/reverted"
   LET o[i].opt_char = "s"
   LET o[i].arg_type = mygetopt.NONE
 
   LET i = o.getLength() + 1
   LET o[i].name = "list"
-  LET o[i].description = "Lists the archive content"
+  LET o[i].description = "lists the archive content"
   LET o[i].opt_char = "l"
   LET o[i].arg_type = mygetopt.NONE
 
@@ -117,16 +122,23 @@ PRIVATE FUNCTION parseArgs(argsarr)
 
   LET i = o.getLength() + 1
   LET o[i].name = "undo"
-  LET o[i].description = "Reverts the install"
+  LET o[i].description = "reverts the install"
   LET o[i].opt_char = "u"
   LET o[i].arg_type = mygetopt.NONE
 
-  { --TODO
   LET i = o.getLength() + 1
   LET o[i].name = "quiet"
-  LET o[i].description = "Does install quietly without asking yes/no"
+  LET o[i].description = "quiet mode, emits less lines"
   LET o[i].opt_char = "q"
   LET o[i].arg_type = mygetopt.NONE
+
+  LET i = o.getLength() + 1
+  LET o[i].name = "overwrite"
+  LET o[i].description = "overwrite files WITHOUT prompting"
+  LET o[i].opt_char = "o"
+  LET o[i].arg_type = mygetopt.NONE
+
+  { --TODO
 
   LET i = o.getLength() + 1
   LET o[i].name = "logfile"
@@ -164,9 +176,11 @@ PRIVATE FUNCTION parseArgs(argsarr)
         LET _opt_undo = TRUE
       WHEN 'i'
         LET _opt_plain = TRUE
+      WHEN 'q'
+        LET _opt_quiet = TRUE
+      WHEN 'o'
+        LET _opt_overwrite = TRUE
         { --TODO
-        WHEN 'q'
-          LET _opt_quiet = TRUE
         WHEN 'L'
           LET _opt_logfile = opt_arg
         WHEN 'd'
@@ -280,29 +294,56 @@ PRIVATE FUNCTION isDir(root, name)
   RETURN node IS NOT NULL AND node.getTagName() == "Dir"
 END FUNCTION
 
-PRIVATE FUNCTION analyze(root)
+PRIVATE FUNCTION analyze(root, recurse)
   DEFINE root, child {, lastChild} om.DomNode
-  DEFINE numChildren INT
+  DEFINE recurse BOOLEAN
+  DEFINE numChildren, numFiles, numDirs INT
+  DEFINE retChildren, retFiles, retDirs INT
+  DEFINE tag STRING
   --DEFINE children DYNAMIC ARRAY OF om.DomNode
   LET child = root.getFirstChild()
   WHILE child IS NOT NULL
     LET numChildren = numChildren + 1
+    LET tag = child.getTagName()
+    CASE
+      WHEN tag == "File"
+        LET numFiles = numFiles + 1
+      WHEN tag == "Dir"
+        LET numDirs = numDirs + 1
+    END CASE
     --LET children[children.getLength()+1]=child.getAttribute("name")
     --LET lastChild = child
+    IF recurse THEN
+      CALL analyze(child, TRUE) RETURNING retChildren, retFiles, retDirs
+      LET numChildren = numChildren + retChildren
+      LET numFiles = numFiles + retFiles
+      LET numDirs = numDirs + retDirs
+    END IF
     LET child = child.getNext()
   END WHILE
   CALL root.setAttribute("numChildren", numChildren)
-  RETURN numChildren
+  CALL root.setAttribute("numFiles", numFiles)
+  CALL root.setAttribute("numDirs", numDirs)
+  RETURN numChildren, numFiles, numDirs
 END FUNCTION
 
+{
 PRIVATE FUNCTION getNumChildren(root)
   DEFINE root om.DomNode
   RETURN root.getAttribute("numChildren")
 END FUNCTION
+}
 
-PRIVATE FUNCTION doit(root, numChildren)
+PRIVATE FUNCTION getNumFiles(root)
   DEFINE root om.DomNode
-  DEFINE numChildren INT
+  DEFINE numChildren, numFiles, numDirs INT
+  CALL analyze(root, TRUE) RETURNING numChildren, numFiles, numDirs
+  RETURN numFiles
+END FUNCTION
+
+PRIVATE FUNCTION doit(root, numChildren, numDirs, numFiles)
+  DEFINE root om.DomNode
+  DEFINE numChildren, numDirs, numFiles INT
   DEFINE defRoot STRING
   {
   IF _opt_ext_dir IS NOT NULL THEN
@@ -310,12 +351,13 @@ PRIVATE FUNCTION doit(root, numChildren)
     MYASSERT(os.Path.chDir(_opt_ext_dir) == TRUE)
   END IF
   }
-  IF numChildren == 1 THEN --single root , no need to compute one
+  IF numChildren == 1
+      AND numDirs == 1 THEN --single root , no need to compute one
     IF _opt_in_FGLDIR THEN
       CALL userError(
           "This package is not prepared to be installed over FGLDIR(yet).")
     END IF
-    CALL unzip(root)
+    CALL unzip(root, NULL)
   ELSE
     IF _opt_in_FGLDIR THEN
       CALL unzipOverFGLDIR(root)
@@ -323,42 +365,93 @@ PRIVATE FUNCTION doit(root, numChildren)
       IF NOT _opt_plain THEN --by default create a single root directory to avoid cluttering the current directory with multiple files and extract the zip beneath that single root directory
         LET defRoot = computeDefName()
         IF NOT os.Path.exists(defRoot) THEN
+          IF _opt_undo THEN
+            IF NOT _opt_quiet THEN
+              DISPLAY "Nothing to undo, extraction dir:",
+                  defRoot,
+                  " doesn't exist"
+            END IF
+            RETURN
+          END IF
           CALL mkdirp(defRoot)
-          IF _opt_verbose THEN
-            DISPLAY "created extraction root:", os.Path.fullPath(defRoot)
+          IF NOT _opt_quiet THEN
+            DISPLAY "created extraction root:", defRoot
+          END IF
+        ELSE
+          IF NOT _opt_quiet THEN
+            DISPLAY SFMT("extraction root:%1 does already exist", defRoot)
           END IF
         END IF
-        MYASSERT(os.Path.chDir(defRoot) == TRUE)
+        CALL myChdir(defRoot)
       ELSE
-        IF NOT _opt_simulate AND NOT _opt_undo THEN
-          CALL checkFilesExisting(root)
+        IF NOT _opt_undo THEN
+          CALL checkFilesExisting(numDirs, numFiles)
         END IF
       END IF
-      CALL unzip(root)
+      CALL unzip(root, defRoot)
     END IF
   END IF
 END FUNCTION
 
-PRIVATE FUNCTION unzip(root)
+PRIVATE FUNCTION unzip(root, defRootDir)
   DEFINE root om.DomNode
-  DEFINE cmd STRING
+  DEFINE defRootDir, fullDefRoot, pwd, cmd, hint, extractDir, simulated STRING
   DEFINE code INT
+  DEFINE isInWorkDir BOOLEAN
+  DEFINE sb base.StringBuffer
+  LET pwd = os.Path.pwd()
+  LET extractDir = pwd
+  IF defRootDir IS NOT NULL THEN
+    LET fullDefRoot = os.Path.fullPath(os.Path.join("..", defRootDir))
+    --DISPLAY "fullDefRoot:", fullDefRoot
+  END IF
+  LET isInWorkDir = (pwd == _pwd)
+  LET hint = IIF(isInWorkDir, "(working directory)", "")
+  CASE
+    WHEN defRootDir IS NOT NULL
+      LET extractDir = ".", os.Path.separator(), defRootDir
+      LET hint = "(added root directory)"
+    WHEN _pwd == pwd
+      LET hint = "(working directory)"
+    WHEN _pwd == _fgldir
+      LET hint = "(FGLDIR)"
+  END CASE
+  IF NOT _opt_undo THEN
+    CALL checkFilesOverwriting(root, extractDir, hint)
+  END IF
   IF _opt_simulate THEN
+    LET sb = base.StringBuffer.create()
+    CALL simulate(root, pwd, sb)
+    LET simulated = sb.toString()
     IF _opt_undo THEN
-      DISPLAY "Would remove in:", os.Path.pwd()
-      DISPLAY "(N no file/dir) (D remove dir if empty) (F remove File) (C conflict)"
+      IF simulated.getLength() == 0 AND NOT os.Path.exists(fullDefRoot) THEN
+        DISPLAY "Nothing to undo"
+        RETURN
+      END IF
+      IF os.Path.exists(fullDefRoot) THEN
+        LET simulated = simulated, "\nD ", defRootDir
+      END IF
+      DISPLAY SFMT("Would remove in:%1%2", extractDir, hint)
+      DISPLAY "(D remove dir if empty) (F remove File) (C conflict)", simulated
     ELSE
-      DISPLAY "Would extract in:", os.Path.pwd()
-      DISPLAY "(N new file/dir) (D overwrite dir) (F overwrite File) (C conflict)"
+      DISPLAY SFMT("Would extract in:%1%2", extractDir, hint)
+      DISPLAY "(N new file/dir) (D dir exists) (F overwrite File) (C conflict)",
+          simulated
     END IF
-    CALL simulate(root, os.Path.pwd())
     RETURN
   END IF
   IF _opt_undo THEN
-    CALL undo(root, os.Path.pwd())
+    CALL undo(root, pwd)
+    IF defRootDir IS NOT NULL AND os.Path.exists(fullDefRoot) THEN
+      CALL myChdir("..")
+      CALL myDeleteDir(defRootDir)
+    END IF
     RETURN
   END IF
   --CALL generateUndoScript(root)
+  IF NOT _opt_quiet THEN
+    DISPLAY SFMT("extract in:%1%2", extractDir, hint)
+  END IF
   LET cmd = SFMT("%1 xf %2", tarExe(), quote(_product_zip))
   IF _opt_verbose THEN
     DISPLAY "unzip cmd:", cmd
@@ -368,6 +461,21 @@ PRIVATE FUNCTION unzip(root)
     EXIT PROGRAM code
   END IF
   CALL verify(root, os.Path.pwd())
+END FUNCTION
+
+PRIVATE FUNCTION myDeleteDir(path)
+  DEFINE path STRING
+  IF os.Path.exists(path) AND os.Path.isDirectory(path) THEN
+    IF NOT os.Path.delete(path) THEN
+      IF NOT _opt_quiet THEN
+        DISPLAY "Could not delete dir:", formatPath(path), ",probably not empty"
+      END IF
+    ELSE
+      IF NOT _opt_quiet THEN
+        DISPLAY "deleted dir:", formatPath(path), "/"
+      END IF
+    END IF
+  END IF
 END FUNCTION
 
 PRIVATE FUNCTION undo(parent, parentDir)
@@ -380,25 +488,19 @@ PRIVATE FUNCTION undo(parent, parentDir)
     IF tag == "File" THEN
       IF os.Path.exists(path) THEN
         IF NOT os.Path.delete(path) THEN
-          DISPLAY "couldn't delete:", path
+          IF NOT _opt_quiet THEN
+            DISPLAY "couldn't delete:", formatPath(path)
+          END IF
         ELSE
-          IF _opt_verbose THEN
-            DISPLAY "deleted file:", path
+          IF NOT _opt_quiet THEN
+            DISPLAY "deleted file:", formatPath(path)
           END IF
         END IF
       END IF
     END IF
     CALL undo(child, path)
     IF tag == "Dir" THEN
-      IF os.Path.exists(path) AND os.Path.isDirectory(path) THEN
-        IF NOT os.Path.delete(path) THEN
-          DISPLAY "Could not delete dir:", path, ",probably not empty"
-        ELSE
-          IF _opt_verbose THEN
-            DISPLAY "deleted dir:", path, "/"
-          END IF
-        END IF
-      END IF
+      CALL myDeleteDir(path)
     END IF
     LET child = child.getNext()
   END WHILE
@@ -420,8 +522,8 @@ PRIVATE FUNCTION verify(parent, parentDir)
       OTHERWISE
         CALL myErr(SFMT("unexpected tagName:%1", tag))
     END CASE
-    IF _opt_verbose THEN
-      DISPLAY "verified:", path
+    IF NOT _opt_quiet THEN
+      DISPLAY "verified:", formatPath(path)
     END IF
     CALL verify(child, path)
     LET child = child.getNext()
@@ -429,9 +531,10 @@ PRIVATE FUNCTION verify(parent, parentDir)
 END FUNCTION
 
 #+check if the unzip command did work
-PRIVATE FUNCTION simulate(parent, parentDir)
+PRIVATE FUNCTION simulate(parent, parentDir, sb)
   DEFINE parent, child om.DomNode
   DEFINE parentDir, path, tag, marker STRING
+  DEFINE sb base.StringBuffer
   LET child = parent.getFirstChild()
   WHILE child IS NOT NULL
     LET path = os.Path.join(parentDir, child.getAttribute("name"))
@@ -442,8 +545,12 @@ PRIVATE FUNCTION simulate(parent, parentDir)
           LET marker = IIF(os.Path.isFile(path), "C", "D")
         ELSE
           LET marker = "N"
+          IF _opt_undo THEN
+            GOTO continue_simulate
+          END IF
         END IF
-        DISPLAY SFMT("%1 %2%3", marker, path, os.Path.separator())
+        CALL sb.append(
+            SFMT("\n%1 %2%3", marker, formatPath(path), os.Path.separator()))
         IF marker == "C" THEN
           DISPLAY "  expected: directory, actual: file"
         END IF
@@ -452,23 +559,26 @@ PRIVATE FUNCTION simulate(parent, parentDir)
           LET marker = IIF(os.Path.isDirectory(path), "C", "F")
         ELSE
           LET marker = "N"
+          IF _opt_undo THEN
+            GOTO continue_simulate
+          END IF
         END IF
-        DISPLAY SFMT("%1 %2", marker, path)
+        CALL sb.append(SFMT("\n%1 %2", marker, formatPath(path)))
         IF marker == "C" THEN
           DISPLAY "  expected: file, actual: directory"
         END IF
       OTHERWISE
         CALL myErr(SFMT("unexpected tagName:%1", tag))
     END CASE
-    CALL simulate(child, path)
+    LABEL continue_simulate:
+    CALL simulate(child, path, sb)
     LET child = child.getNext()
   END WHILE
 END FUNCTION
 
-PRIVATE FUNCTION checkFilesExisting(root)
-  DEFINE root om.DomNode
-  DEFINE dh INT
-  DEFINE fname, ans STRING
+PRIVATE FUNCTION checkFilesExisting(numDirs, numFiles)
+  DEFINE numDirs, numFiles, dh INT
+  DEFINE fname, ff STRING
   DEFINE foundEntries INT
   LET dh = os.Path.dirOpen(os.Path.pwd())
   IF dh == 0 THEN
@@ -482,15 +592,96 @@ PRIVATE FUNCTION checkFilesExisting(root)
   END WHILE
   CALL os.Path.dirClose(dh)
   IF foundEntries > 0 THEN
-    LET ans =
-        yesno(
-            SFMT("There are already %1 files, folders or links in this directory...\nContinue extracting %2 files ?",
-                foundEntries, getNumChildren(root)))
-    --DISPLAY "ans:",ans
-    IF NOT ans.equals("yes") THEN
-      EXIT PROGRAM 1
-    END IF
+    LET ff = IIF(numDirs > 0, SFMT("%1 directories", numDirs), NULL)
+    LET ff =
+        IIF(numFiles > 0,
+            SFMT("%1%2 files",
+                IIF(ff IS NOT NULL, SFMT("%1 and ", ff), ""), numFiles),
+            ff)
+    CALL confirm_or_exit(
+        SFMT("The directory:%1 is not empty(%2 files or folders inside)...\nContinue extracting %3 in this directory ?",
+            formatPath(os.Path.pwd()), foundEntries, ff))
   END IF
+END FUNCTION
+
+PRIVATE FUNCTION checkFilesOverwriting(root, extractDir, hint)
+  DEFINE root om.DomNode
+  DEFINE extractDir, hint STRING
+  DEFINE numOvr, numConflicts, numFiles INT
+  CALL checkFilesOverwritingInt(root, os.Path.pwd())
+      RETURNING numConflicts, numOvr
+  CASE
+    WHEN numConflicts > 0
+      CALL confirm_or_exit(
+          SFMT("Found %1 conflicts(files overwriting existing directories or directories overwriting existing files...\nReally Continue extracting files?",
+              numConflicts))
+    WHEN numOvr > 0
+      LET numFiles = getNumFiles(root)
+      CALL confirm_or_exit(
+          SFMT("%1 files will be overwritten beneath %2%3%4...\nContinue extracting %5 files?",
+              numOvr,
+              extractDir,
+              hint,
+              IIF(numOvr == numFiles,
+                  "\n(probably a previous version is overwritten)",
+                  ""),
+              numFiles))
+  END CASE
+END FUNCTION
+
+PRIVATE FUNCTION findName(parent, name)
+  DEFINE parent, child om.DomNode
+  DEFINE name STRING
+  LET child = parent.getFirstChild()
+  WHILE child IS NOT NULL
+    IF child.getAttribute("name") == name THEN
+      RETURN child
+    END IF
+    LET child = child.getNext()
+  END WHILE
+  RETURN NULL
+END FUNCTION
+
+#+ checks how many files we overwrite and how much potential conflicts we may have
+PRIVATE FUNCTION checkFilesOverwritingInt(parent, dir)
+  DEFINE parent, child om.DomNode
+  DEFINE dir, type, full, fname STRING
+  DEFINE dh INT
+  DEFINE ovr, retOvr INT
+  DEFINE conflicts, retConflicts INT
+  LET dh = os.Path.dirOpen(dir)
+  IF dh == 0 THEN
+    CALL userError(SFMT("Can't open directory '%1'", os.Path.pwd()))
+  END IF
+  WHILE (fname := os.Path.dirNext(dh)) IS NOT NULL
+    IF fname == "." OR fname == ".." THEN
+      CONTINUE WHILE
+    END IF
+    LET child = findName(parent, fname)
+    LET type = IIF(child IS NOT NULL, child.getTagName(), "none")
+    LET full = os.Path.join(dir, fname)
+    CASE
+      WHEN type.equals("File")
+        IF os.Path.isFile(full) THEN
+          LET ovr = ovr + 1
+        ELSE
+          LET conflicts = conflicts + 1
+        END IF
+      WHEN type.equals("Dir")
+        IF os.Path.isDirectory(full) THEN
+          CALL checkFilesOverwritingInt(parent: child, dir: full)
+              RETURNING retConflicts, retOvr
+          LET conflicts = conflicts + retConflicts
+          LET ovr = ovr + retOvr
+        ELSE
+          LET conflicts = conflicts + 1
+        END IF
+        --OTHERWISE
+        --  DISPLAY "unknown type:", type, " for:", full
+    END CASE
+  END WHILE
+  CALL os.Path.dirClose(dh)
+  RETURN conflicts, ovr
 END FUNCTION
 
 PRIVATE FUNCTION isGBC(root)
@@ -518,7 +709,7 @@ PRIVATE FUNCTION unzipGBCoverFGLDIR(root)
   LET gbcDir = SFMT("%1/web_utilities/gbc/gbc", getFglDir())
   CALL mkdirp(gbcDir)
   CALL myChdir(gbcDir)
-  CALL unzip(root)
+  CALL unzip(root, NULL)
 END FUNCTION
 
 PRIVATE FUNCTION unzipOverFGLDIR(root)
@@ -527,7 +718,7 @@ PRIVATE FUNCTION unzipOverFGLDIR(root)
     CALL unzipGBCoverFGLDIR(root)
   ELSE
     CALL myChdir(getFglDir())
-    CALL unzip(root)
+    CALL unzip(root, NULL)
   END IF
 END FUNCTION
 
@@ -538,7 +729,7 @@ PRIVATE FUNCTION generateUndoScript(root)
   LET ch_sh = base.Channel.create()
   LET name_sh = SFMT("rm-%1.sh", computeDefName())
   CALL ch_sh.openFile(name_sh, "w")
-  CALL ch_sh.writeLine("#!/bin/bash")
+  CALL ch_sh.writeLine("#!/bin/sh")
   IF isWin() THEN
     LET ch_bat = base.Channel.create()
     LET name_bat = SFMT("rm-%1.bat", computeDefName())
@@ -911,6 +1102,23 @@ FUNCTION readTextFile(filename) RETURNS STRING
   RETURN content
 END FUNCTION
 
+FUNCTION formatPath(path)
+  DEFINE path, fgldir STRING
+  CASE
+    WHEN _pwd == path
+      RETURN "working dir"
+    WHEN path.getIndexOf(_pwd, 1) == 1
+      RETURN quote(path.subString(_pwd.getLength() + 2, path.getLength()))
+    WHEN os.Path.pwd() == _fgldir
+      LET fgldir = IIF(isWin(), "%FGLDIR%", "$FGLDIR")
+      RETURN quote(
+          SFMT("%1%2",
+              fgldir,
+              path.subString(_fgldir.getLength() + 1, path.getLength())))
+  END CASE
+  RETURN path
+END FUNCTION
+
 FUNCTION yesno_mode()
   DEFINE yesno_msg STRING
   LET yesno_msg = fgl_getenv("__FGL_UNZIP_YESNO_MESSAGE__")
@@ -925,7 +1133,11 @@ PRIVATE FUNCTION yesno_cmd(message)
   DEFINE message STRING
   DEFINE cmd, ans, resfile STRING
   DEFINE code INT
-  CALL fgl_setenv("FGLGUI", "0")
+  IF NOT isWin() THEN
+    IF fgl_getenv("INFORMIXTERM") IS NULL THEN
+      CALL fgl_setenv("INFORMIXTERM", "terminfo") --nowadays: the better default
+    END IF
+  END IF
   CALL fgl_setenv("__FGL_UNZIP_YESNO_MESSAGE__", message)
   LET resfile = makeTempName()
   CALL fgl_setenv("__FGL_UNZIP_RESULT_FILE__", resfile)
@@ -945,16 +1157,27 @@ END FUNCTION
 --and calls a MENU with yes no
 PRIVATE FUNCTION yesno(message)
   DEFINE message STRING
-  DEFINE fglgui, ans, resfile, frmfile STRING
+  DEFINE fglgui, ans, resfile, frmfile, ret STRING
+  IF _opt_overwrite OR _opt_simulate THEN
+    IF _opt_simulate THEN
+      DISPLAY "If answer to '", message, "' is yes..."
+    END IF
+    RETURN "yes"
+  END IF
   LET fglgui = fgl_getenv("FGLGUI")
   IF NOT fglgui.equals("0") THEN --run sub process
-    RETURN yesno_cmd(message)
+    CALL fgl_setenv("FGLGUI", "0")
+    LET ret = yesno_cmd(message)
+    CALL fgl_setenv("FGLGUI", fglgui)
+    RETURN ret
   END IF
   LET resfile = fgl_getenv("__FGL_UNZIP_RESULT_FILE__")
   LET frmfile = makeTempName(), ".42f"
   CALL writeStringToFile(frmfile, fglunzip_42f())
-  OPTIONS MENU LINE 5
-  OPTIONS COMMENT LINE 6
+  --DISPLAY 'fgl_getenv("FGLGUI")=',fgl_getenv("FGLGUI")
+  OPTIONS FORM LINE 2
+  OPTIONS MENU LINE 6
+  OPTIONS COMMENT LINE 7
   OPEN FORM f FROM frmfile
   DISPLAY FORM f
   CALL os.Path.delete(frmfile) RETURNING status
@@ -973,12 +1196,23 @@ PRIVATE FUNCTION yesno(message)
   RETURN ans
 END FUNCTION
 
+FUNCTION confirm_or_exit(message)
+  DEFINE message, ans STRING
+  LET ans = yesno(message)
+  --DISPLAY "ans:",ans
+  IF NOT ans.equals("yes") THEN
+    EXIT PROGRAM 1
+  END IF
+END FUNCTION
+
 --returns fglunzip.per ready compiled
 FUNCTION fglunzip_42f()
-  RETURN '<?xml version=\'1.0\' encoding=\'UTF-8\'?>\n<Form name="fglunzip" build="5.01.02" width="80" height="2" delimiters="">\n<Screen width="80" height="2">\n<FormField name="formonly.msg" colName="msg" fieldId="0" sqlTabName="formonly" tabIndex="1">\n<TextEdit wantReturns="1" scrollBars="none" scroll="0" height="2" width="78" posY="0" posX="1" gridWidth="78" gridHeight="2"/>\n</FormField>\n</Screen>\n<RecordView tabName="formonly">\n<Link colName="msg" fieldIdRef="0"/>\n</RecordView>\n</Form>'
+  RETURN '<?xml version=\'1.0\' encoding=\'UTF-8\'?>\n<Form name="fglunzip" build="5.01.02" width="80" height="4" delimiters="">\n<Screen width="80" height="4">\n<FormField name="formonly.msg" colName="msg" fieldId="0" sqlTabName="formonly" tabIndex="1">\n<TextEdit wantReturns="1" scrollBars="none" scroll="0" height="4" width="78" posY="0" posX="1" gridWidth="78" gridHeight="2"/>\n</FormField>\n</Screen>\n<RecordView tabName="formonly">\n<Link colName="msg" fieldIdRef="0"/>\n</RecordView>\n</Form>'
 END FUNCTION
 --SCREEN
 --{
+--[msg                                                                           ]
+--[msg                                                                           ]
 --[msg                                                                           ]
 --[msg                                                                           ]
 --}
