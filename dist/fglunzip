@@ -369,8 +369,8 @@ rm -rf $_TMPDIR
 exit $mycode
 #__CAT_EOF_BEGIN__:fglunzip_version.inc
 #public CONSTANT GIT_VERSION="1.00.00dev"
-#public CONSTANT GIT_COMMIT_COUNT=9
-#public CONSTANT GIT_REV="gd37392ae"
+#public CONSTANT GIT_COMMIT_COUNT=22
+#public CONSTANT GIT_REV="ga3798dd2"
 #__CAT_EOF_END__
 #__CAT_EOF_BEGIN__:myassert.inc
 #&define MYERRCALL myErr
@@ -543,15 +543,18 @@ exit $mycode
 #
 #END MAIN
 #
-#PUBLIC FUNCTION opt_arg(gr GetoptR) RETURNS STRING
+#PUBLIC FUNCTION opt_arg(gr)
+#  DEFINE gr GetoptR
 #  RETURN gr[1].opt_arg
 #END FUNCTION
 #
-#PUBLIC FUNCTION opt_char(gr GetoptR) RETURNS STRING
+#PUBLIC FUNCTION opt_char(gr)
+#  DEFINE gr GetoptR
 #  RETURN gr[1].opt_char
 #END FUNCTION
 #
-#PUBLIC FUNCTION option_index(gr GetoptR) RETURNS STRING
+#PUBLIC FUNCTION option_index(gr)
+#  DEFINE gr GetoptR
 #  RETURN gr[1].option_index
 #END FUNCTION
 #
@@ -560,9 +563,10 @@ exit $mycode
 ##+ @param ind First argument to copy
 ##+
 ##+ @return An array of string
-#PUBLIC FUNCTION copyArguments(ind INTEGER) RETURNS DYNAMIC ARRAY OF STRING
+#PUBLIC FUNCTION copyArguments(ind)
+#-- RETURNS DYNAMIC ARRAY OF STRING
+#  DEFINE ind, i INTEGER
 #  DEFINE argv DYNAMIC ARRAY OF STRING
-#  DEFINE i INTEGER
 #  DEFINE argc INTEGER
 #
 #  LET argc = 0
@@ -573,9 +577,10 @@ exit $mycode
 #  RETURN argv
 #END FUNCTION
 #
-#PUBLIC FUNCTION copyArgumentsFromArr(
-#    argsarr DYNAMIC ARRAY OF STRING, ind INTEGER)
-#    RETURNS DYNAMIC ARRAY OF STRING
+#PUBLIC FUNCTION copyArgumentsFromArr(argsarr, ind)
+#  --  RETURNS DYNAMIC ARRAY OF STRING
+#  DEFINE argsarr DYNAMIC ARRAY OF STRING
+#  DEFINE ind INT
 #  DEFINE argv DYNAMIC ARRAY OF STRING
 #  DEFINE i INTEGER
 #  DEFINE argc INTEGER
@@ -593,9 +598,9 @@ exit $mycode
 ##+ @param argv The arguments list to expand
 ##+
 ##+ @return An array of string
-#PRIVATE FUNCTION expandArguments(
-#    argv DYNAMIC ARRAY OF STRING)
-#    RETURNS(INTEGER, DYNAMIC ARRAY OF STRING)
+#PRIVATE FUNCTION expandArguments(argv)
+#  --RETURNS(INTEGER, DYNAMIC ARRAY OF STRING)
+#  DEFINE argv DYNAMIC ARRAY OF STRING
 #  DEFINE rv DYNAMIC ARRAY OF STRING
 #  DEFINE i INTEGER
 #  DEFINE argc INTEGER
@@ -632,6 +637,30 @@ exit $mycode
 #  RETURN SUCCESS, rv
 #END FUNCTION
 #
+#PRIVATE FUNCTION searchName(options, name)
+#  DEFINE options GetoptOptions
+#  DEFINE name STRING
+#  DEFINE i INT
+#  FOR i = 1 TO options.getLength()
+#    IF options[i].name == name THEN
+#      RETURN i
+#    END IF
+#  END FOR
+#  RETURN 0
+#END FUNCTION
+#
+#PRIVATE FUNCTION searchOptChar(options, opt_char)
+#  DEFINE options GetoptOptions
+#  DEFINE opt_char STRING
+#  DEFINE i INT
+#  FOR i = 1 TO options.getLength()
+#    IF options[i].opt_char == opt_char THEN
+#      RETURN i
+#    END IF
+#  END FOR
+#  RETURN 0
+#END FUNCTION
+#
 ##+
 ##+ Getopt isAnOption method.
 ##+
@@ -641,20 +670,24 @@ exit $mycode
 ##+
 ##+ @return TRUE if parameter is a valid option, FALSE otherwise
 ##+
-#PRIVATE FUNCTION isAnOption(gr GetoptR, param STRING) RETURNS BOOLEAN
+#PRIVATE FUNCTION isAnOption(gr, param)
+#  DEFINE gr GetoptR
+#  DEFINE param STRING
 #  # An option must start with - or --
 #  IF param.getCharAt(1) == '-' THEN
 #    LET param = param.subString(2, param.getLength())
 #    IF param.getCharAt(1) == '-' THEN
 #      # Handle long option
 #      LET param = param.subString(2, param.getLength())
-#      IF gr[1]._options.search("name", param) > 0 THEN
+#      --IF gr[1]._options.search("name", param) > 0 THEN
+#      IF searchName(gr[1]._options, param) > 0 THEN
 #        RETURN TRUE # Is a long option
 #      END IF
 #    ELSE
 #      IF param.getLength() == 1 THEN
 #        # Handle short option
-#        IF gr[1]._options.search("opt_char", param) > 0 THEN
+#        --IF gr[1]._options.search("opt_char", param) > 0 THEN
+#        IF searchOptChar(gr[1]._options, param) > 0 THEN
 #          RETURN TRUE # Is a short option
 #        END IF
 #      END IF
@@ -684,18 +717,23 @@ exit $mycode
 ##+ @param options    The GetoptOptions array of options definitions
 ##+
 ##+
-#PUBLIC FUNCTION initialize(
-#    gr GetoptR,
-#    prog_name STRING,
-#    argv DYNAMIC ARRAY OF STRING,
-#    options GetoptOptions)
+#PUBLIC FUNCTION initialize(gr, prog_name, argv, options)
+#  DEFINE gr GetoptR
+#  DEFINE prog_name STRING
+#  DEFINE argv DYNAMIC ARRAY OF STRING
+#  DEFINE options GetoptOptions
+#  DEFINE i INT
 #  LET gr[1].prog_name = prog_name
 #  LET gr[1].next_char = NULL
 #  LET gr[1].opt_ind = 0
 #  LET gr[1].opt_char = ""
 #  LET gr[1].opt_arg = NULL
 #  LET gr[1].status = SUCCESS
-#  CALL options.copyTo(gr[1]._options)
+#  CALL gr[1]._options.clear()
+#  --CALL options.copyTo(gr[1]._options)
+#  FOR i = 1 TO options.getLength()
+#    LET gr[1]._options[i].* = options[i].*
+#  END FOR
 #  CALL expandArguments(argv) RETURNING gr[1].status, gr[1].argv
 #END FUNCTION
 #
@@ -707,7 +745,9 @@ exit $mycode
 ##+
 ##+ @param options    The GetoptOptions array of options definitions
 ##+
-#PUBLIC FUNCTION initDefault(gr GetoptR, options GetoptOptions)
+#PUBLIC FUNCTION initDefault(gr, options)
+#  DEFINE gr GetoptR
+#  DEFINE options GetoptOptions
 #  CALL initialize(gr, os.Path.baseName(arg_val(0)), copyArguments(1), options)
 #END FUNCTION
 #
@@ -717,7 +757,8 @@ exit $mycode
 ##+
 ##+ @return The number of additional arguments.
 ##+
-#PUBLIC FUNCTION getMoreArgumentCount(gr GetoptR) RETURNS INTEGER
+#PUBLIC FUNCTION getMoreArgumentCount(gr)
+#  DEFINE gr GetoptR
 #  IF gr[1].status == EOF THEN
 #    RETURN gr[1].argv.getLength() - gr[1].opt_ind + 1
 #  END IF
@@ -744,7 +785,9 @@ exit $mycode
 ##+
 ##+ @return The value of the additional argument.
 ##+
-#PUBLIC FUNCTION getMoreArgument(gr GetoptR, ind INTEGER) RETURNS STRING
+#PUBLIC FUNCTION getMoreArgument(gr, ind)
+#  DEFINE gr GetoptR
+#  DEFINE ind INTEGER
 #  DEFINE x INTEGER
 #  LET x = gr[1].opt_ind + ind - 1
 #  IF x > 0 AND x <= gr[1].argv.getLength() THEN
@@ -760,7 +803,8 @@ exit $mycode
 ##+
 ##+ @return TRUE if the option parsing is done.
 ##+
-#PUBLIC FUNCTION isEof(gr GetoptR) RETURNS BOOLEAN
+#PUBLIC FUNCTION isEof(gr)
+#  DEFINE gr GetoptR
 #  RETURN gr[1].status == EOF
 #END FUNCTION
 #
@@ -771,7 +815,8 @@ exit $mycode
 ##+
 ##+ @return TRUE if the option parsing detected an invalid argument.
 ##+
-#PUBLIC FUNCTION invalidOptionSeen(gr GetoptR) RETURNS BOOLEAN
+#PUBLIC FUNCTION invalidOptionSeen(gr)
+#  DEFINE gr GetoptR
 #  RETURN gr[1].status == BAD_OPTION
 #END FUNCTION
 #
@@ -781,7 +826,8 @@ exit $mycode
 ##+
 ##+ @return TRUE if the option parsing succeeded.
 ##+
-#PUBLIC FUNCTION isSuccess(gr GetoptR) RETURNS BOOLEAN
+#PUBLIC FUNCTION isSuccess(gr)
+#  DEFINE gr GetoptR
 #  RETURN gr[1].status == SUCCESS
 #END FUNCTION
 #
@@ -801,7 +847,8 @@ exit $mycode
 ##+
 ##+ @return The processing status (getopt.SUCCESS | getopt.EOF | getopt.BAD_ARGUMENT)
 ##+
-#PUBLIC FUNCTION getopt(gr GetoptR) RETURNS INTEGER
+#PUBLIC FUNCTION getopt(gr)
+#  DEFINE gr GetoptR
 #  DEFINE arg STRING
 #
 #  IF gr[1].status != SUCCESS THEN
@@ -844,7 +891,9 @@ exit $mycode
 ##+
 ##+ @param more_args The non option string to add to usage
 ##+
-#PUBLIC FUNCTION displayUsage(gr GetoptR, more_args STRING)
+#PUBLIC FUNCTION displayUsage(gr, more_args)
+#  DEFINE gr GetoptR
+#  DEFINE more_args STRING
 #  DEFINE ind INTEGER
 #  DEFINE delta INTEGER
 #  DEFINE sb base.StringBuffer
@@ -896,7 +945,8 @@ exit $mycode
 #END FUNCTION
 #
 ## Set status to EOF
-#PRIVATE FUNCTION eof(gr GetoptR) RETURNS INTEGER
+#PRIVATE FUNCTION eof(gr)
+#  DEFINE gr GetoptR
 #  LET gr[1].opt_char = NULL
 #  LET gr[1].opt_arg = NULL
 #  LET gr[1].status = EOF
@@ -904,7 +954,8 @@ exit $mycode
 #END FUNCTION
 #
 ## Set status to BAD_OPTION
-#PRIVATE FUNCTION bad_option(gr GetoptR) RETURNS INTEGER
+#PRIVATE FUNCTION bad_option(gr)
+#  DEFINE gr GetoptR
 #  LET gr[1].opt_char = NULL
 #  LET gr[1].opt_arg = NULL
 #  LET gr[1].status = BAD_OPTION
@@ -912,7 +963,8 @@ exit $mycode
 #END FUNCTION
 #
 ## Parse current argument as a long option name
-#PRIVATE FUNCTION parseLong(gr GetoptR) RETURNS INTEGER
+#PRIVATE FUNCTION parseLong(gr)
+#  DEFINE gr GetoptR
 #  DEFINE arg STRING
 #  DEFINE equal_sign_index INTEGER
 #  DEFINE ind INTEGER
@@ -1008,7 +1060,8 @@ exit $mycode
 #END FUNCTION
 #
 ## Parse current argument as a short option name
-#PRIVATE FUNCTION parseShort(gr GetoptR) RETURNS INTEGER
+#PRIVATE FUNCTION parseShort(gr)
+#  DEFINE gr GetoptR
 #  DEFINE arg STRING
 #  DEFINE equal_sign_index INTEGER
 #  DEFINE ind INTEGER
@@ -1110,30 +1163,35 @@ exit $mycode
 #DEFINE _opt_verbose BOOLEAN
 #DEFINE _opt_in_FGLDIR BOOLEAN
 #DEFINE _opt_simulate BOOLEAN
+#DEFINE _opt_overwrite BOOLEAN
 #DEFINE _opt_undo BOOLEAN
 #DEFINE _opt_plain BOOLEAN
+#DEFINE _pwd STRING
+#DEFINE _fgldir STRING
 #--DEFINE _stdoutNONL STRING
 #--TODO
-#--DEFINE _opt_quiet BOOLEAN
+#DEFINE _opt_quiet BOOLEAN
 #--DEFINE _opt_logfile STRING
 #--DEFINE _opt_ext_dir STRING
 #MAIN
 #  DEFINE argsarr DYNAMIC ARRAY OF STRING
 #  DEFINE root om.DomNode
-#  DEFINE numChildren INT
+#  DEFINE numChildren, numFiles, numDirs INT
 #  IF yesno_mode() THEN
 #    RETURN
 #  END IF
+#  LET _pwd = os.Path.pwd()
+#  LET _fgldir = os.Path.fullPath(base.Application.getFglDir())
 #  CALL checkTar()
 #  LET argsarr = setupArgs()
 #  --DISPLAY "argsarr:",util.JSON.stringify(argsarr)
 #  CALL parseArgs(argsarr)
 #  LET root = readFiles()
-#  LET numChildren = analyze(root)
+#  CALL analyze(root, FALSE) RETURNING numChildren, numFiles, numDirs
 #  IF numChildren == 0 THEN
 #    CALL userError(SFMT("no entries found in:%1", _product_zip))
 #  END IF
-#  CALL doit(root, numChildren)
+#  CALL doit(root, numChildren, numDirs, numFiles)
 #END MAIN
 #
 #FUNCTION tarExe()
@@ -1175,7 +1233,7 @@ exit $mycode
 #
 #  LET i = o.getLength() + 1
 #  LET o[i].name = "version"
-#  LET o[i].description = "Version information"
+#  LET o[i].description = "version information"
 #  LET o[i].opt_char = "V"
 #  LET o[i].arg_type = mygetopt.NONE
 #
@@ -1193,13 +1251,13 @@ exit $mycode
 #
 #  LET i = o.getLength() + 1
 #  LET o[i].name = "simulate"
-#  LET o[i].description = "simulates what would be extracted/undone"
+#  LET o[i].description = "simulates what would be extracted/reverted"
 #  LET o[i].opt_char = "s"
 #  LET o[i].arg_type = mygetopt.NONE
 #
 #  LET i = o.getLength() + 1
 #  LET o[i].name = "list"
-#  LET o[i].description = "Lists the archive content"
+#  LET o[i].description = "lists the archive content"
 #  LET o[i].opt_char = "l"
 #  LET o[i].arg_type = mygetopt.NONE
 #
@@ -1219,16 +1277,23 @@ exit $mycode
 #
 #  LET i = o.getLength() + 1
 #  LET o[i].name = "undo"
-#  LET o[i].description = "Reverts the install"
+#  LET o[i].description = "reverts the install"
 #  LET o[i].opt_char = "u"
 #  LET o[i].arg_type = mygetopt.NONE
 #
-#  { --TODO
 #  LET i = o.getLength() + 1
 #  LET o[i].name = "quiet"
-#  LET o[i].description = "Does install quietly without asking yes/no"
+#  LET o[i].description = "quiet mode, emits less lines"
 #  LET o[i].opt_char = "q"
 #  LET o[i].arg_type = mygetopt.NONE
+#
+#  LET i = o.getLength() + 1
+#  LET o[i].name = "overwrite"
+#  LET o[i].description = "overwrite files WITHOUT prompting"
+#  LET o[i].opt_char = "o"
+#  LET o[i].arg_type = mygetopt.NONE
+#
+#  { --TODO
 #
 #  LET i = o.getLength() + 1
 #  LET o[i].name = "logfile"
@@ -1266,9 +1331,11 @@ exit $mycode
 #        LET _opt_undo = TRUE
 #      WHEN 'i'
 #        LET _opt_plain = TRUE
+#      WHEN 'q'
+#        LET _opt_quiet = TRUE
+#      WHEN 'o'
+#        LET _opt_overwrite = TRUE
 #        { --TODO
-#        WHEN 'q'
-#          LET _opt_quiet = TRUE
 #        WHEN 'L'
 #          LET _opt_logfile = opt_arg
 #        WHEN 'd'
@@ -1382,29 +1449,56 @@ exit $mycode
 #  RETURN node IS NOT NULL AND node.getTagName() == "Dir"
 #END FUNCTION
 #
-#PRIVATE FUNCTION analyze(root)
+#PRIVATE FUNCTION analyze(root, recurse)
 #  DEFINE root, child {, lastChild} om.DomNode
-#  DEFINE numChildren INT
+#  DEFINE recurse BOOLEAN
+#  DEFINE numChildren, numFiles, numDirs INT
+#  DEFINE retChildren, retFiles, retDirs INT
+#  DEFINE tag STRING
 #  --DEFINE children DYNAMIC ARRAY OF om.DomNode
 #  LET child = root.getFirstChild()
 #  WHILE child IS NOT NULL
 #    LET numChildren = numChildren + 1
+#    LET tag = child.getTagName()
+#    CASE
+#      WHEN tag == "File"
+#        LET numFiles = numFiles + 1
+#      WHEN tag == "Dir"
+#        LET numDirs = numDirs + 1
+#    END CASE
 #    --LET children[children.getLength()+1]=child.getAttribute("name")
 #    --LET lastChild = child
+#    IF recurse THEN
+#      CALL analyze(child, TRUE) RETURNING retChildren, retFiles, retDirs
+#      LET numChildren = numChildren + retChildren
+#      LET numFiles = numFiles + retFiles
+#      LET numDirs = numDirs + retDirs
+#    END IF
 #    LET child = child.getNext()
 #  END WHILE
 #  CALL root.setAttribute("numChildren", numChildren)
-#  RETURN numChildren
+#  CALL root.setAttribute("numFiles", numFiles)
+#  CALL root.setAttribute("numDirs", numDirs)
+#  RETURN numChildren, numFiles, numDirs
 #END FUNCTION
 #
+#{
 #PRIVATE FUNCTION getNumChildren(root)
 #  DEFINE root om.DomNode
 #  RETURN root.getAttribute("numChildren")
 #END FUNCTION
+#}
 #
-#PRIVATE FUNCTION doit(root, numChildren)
+#PRIVATE FUNCTION getNumFiles(root)
 #  DEFINE root om.DomNode
-#  DEFINE numChildren INT
+#  DEFINE numChildren, numFiles, numDirs INT
+#  CALL analyze(root, TRUE) RETURNING numChildren, numFiles, numDirs
+#  RETURN numFiles
+#END FUNCTION
+#
+#PRIVATE FUNCTION doit(root, numChildren, numDirs, numFiles)
+#  DEFINE root om.DomNode
+#  DEFINE numChildren, numDirs, numFiles INT
 #  DEFINE defRoot STRING
 #  {
 #  IF _opt_ext_dir IS NOT NULL THEN
@@ -1412,12 +1506,13 @@ exit $mycode
 #    MYASSERT(os.Path.chDir(_opt_ext_dir) == TRUE)
 #  END IF
 #  }
-#  IF numChildren == 1 THEN --single root , no need to compute one
+#  IF numChildren == 1
+#      AND numDirs == 1 THEN --single root , no need to compute one
 #    IF _opt_in_FGLDIR THEN
 #      CALL userError(
 #          "This package is not prepared to be installed over FGLDIR(yet).")
 #    END IF
-#    CALL unzip(root)
+#    CALL unzip(root, NULL)
 #  ELSE
 #    IF _opt_in_FGLDIR THEN
 #      CALL unzipOverFGLDIR(root)
@@ -1425,42 +1520,93 @@ exit $mycode
 #      IF NOT _opt_plain THEN --by default create a single root directory to avoid cluttering the current directory with multiple files and extract the zip beneath that single root directory
 #        LET defRoot = computeDefName()
 #        IF NOT os.Path.exists(defRoot) THEN
+#          IF _opt_undo THEN
+#            IF NOT _opt_quiet THEN
+#              DISPLAY "Nothing to undo, extraction dir:",
+#                  defRoot,
+#                  " doesn't exist"
+#            END IF
+#            RETURN
+#          END IF
 #          CALL mkdirp(defRoot)
-#          IF _opt_verbose THEN
-#            DISPLAY "created extraction root:", os.Path.fullPath(defRoot)
+#          IF NOT _opt_quiet THEN
+#            DISPLAY "created extraction root:", defRoot
+#          END IF
+#        ELSE
+#          IF NOT _opt_quiet THEN
+#            DISPLAY SFMT("extraction root:%1 does already exist", defRoot)
 #          END IF
 #        END IF
-#        MYASSERT(os.Path.chDir(defRoot) == TRUE)
+#        CALL myChdir(defRoot)
 #      ELSE
-#        IF NOT _opt_simulate AND NOT _opt_undo THEN
-#          CALL checkFilesExisting(root)
+#        IF NOT _opt_undo THEN
+#          CALL checkFilesExisting(numDirs, numFiles)
 #        END IF
 #      END IF
-#      CALL unzip(root)
+#      CALL unzip(root, defRoot)
 #    END IF
 #  END IF
 #END FUNCTION
 #
-#PRIVATE FUNCTION unzip(root)
+#PRIVATE FUNCTION unzip(root, defRootDir)
 #  DEFINE root om.DomNode
-#  DEFINE cmd STRING
+#  DEFINE defRootDir, fullDefRoot, pwd, cmd, hint, extractDir, simulated STRING
 #  DEFINE code INT
+#  DEFINE isInWorkDir BOOLEAN
+#  DEFINE sb base.StringBuffer
+#  LET pwd = os.Path.pwd()
+#  LET extractDir = pwd
+#  IF defRootDir IS NOT NULL THEN
+#    LET fullDefRoot = os.Path.fullPath(os.Path.join("..", defRootDir))
+#    --DISPLAY "fullDefRoot:", fullDefRoot
+#  END IF
+#  LET isInWorkDir = (pwd == _pwd)
+#  LET hint = IIF(isInWorkDir, "(working directory)", "")
+#  CASE
+#    WHEN defRootDir IS NOT NULL
+#      LET extractDir = ".", os.Path.separator(), defRootDir
+#      LET hint = "(added root directory)"
+#    WHEN _pwd == pwd
+#      LET hint = "(working directory)"
+#    WHEN _pwd == _fgldir
+#      LET hint = "(FGLDIR)"
+#  END CASE
+#  IF NOT _opt_undo THEN
+#    CALL checkFilesOverwriting(root, extractDir, hint)
+#  END IF
 #  IF _opt_simulate THEN
+#    LET sb = base.StringBuffer.create()
+#    CALL simulate(root, pwd, sb)
+#    LET simulated = sb.toString()
 #    IF _opt_undo THEN
-#      DISPLAY "Would remove in:", os.Path.pwd()
-#      DISPLAY "(N no file/dir) (D remove dir if empty) (F remove File) (C conflict)"
+#      IF simulated.getLength() == 0 AND NOT os.Path.exists(fullDefRoot) THEN
+#        DISPLAY "Nothing to undo"
+#        RETURN
+#      END IF
+#      IF os.Path.exists(fullDefRoot) THEN
+#        LET simulated = simulated, "\nD ", defRootDir
+#      END IF
+#      DISPLAY SFMT("Would remove in:%1%2", extractDir, hint)
+#      DISPLAY "(D remove dir if empty) (F remove File) (C conflict)", simulated
 #    ELSE
-#      DISPLAY "Would extract in:", os.Path.pwd()
-#      DISPLAY "(N new file/dir) (D overwrite dir) (F overwrite File) (C conflict)"
+#      DISPLAY SFMT("Would extract in:%1%2", extractDir, hint)
+#      DISPLAY "(N new file/dir) (D dir exists) (F overwrite File) (C conflict)",
+#          simulated
 #    END IF
-#    CALL simulate(root, os.Path.pwd())
 #    RETURN
 #  END IF
 #  IF _opt_undo THEN
-#    CALL undo(root, os.Path.pwd())
+#    CALL undo(root, pwd)
+#    IF defRootDir IS NOT NULL AND os.Path.exists(fullDefRoot) THEN
+#      CALL myChdir("..")
+#      CALL myDeleteDir(defRootDir)
+#    END IF
 #    RETURN
 #  END IF
 #  --CALL generateUndoScript(root)
+#  IF NOT _opt_quiet THEN
+#    DISPLAY SFMT("extract in:%1%2", extractDir, hint)
+#  END IF
 #  LET cmd = SFMT("%1 xf %2", tarExe(), quote(_product_zip))
 #  IF _opt_verbose THEN
 #    DISPLAY "unzip cmd:", cmd
@@ -1470,6 +1616,23 @@ exit $mycode
 #    EXIT PROGRAM code
 #  END IF
 #  CALL verify(root, os.Path.pwd())
+#END FUNCTION
+#
+#PRIVATE FUNCTION myDeleteDir(path)
+#  DEFINE path STRING
+#  IF os.Path.exists(path) AND os.Path.isDirectory(path) THEN
+#    IF NOT os.Path.delete(path) THEN
+#      IF NOT _opt_quiet THEN
+#        DISPLAY "Could not delete dir:", formatPath(path), ",probably not empty"
+#        --get the OS error printed
+#        RUN SFMT("rmdir %1", quote(path))
+#      END IF
+#    ELSE
+#      IF NOT _opt_quiet THEN
+#        DISPLAY "deleted dir:", formatPath(path), "/"
+#      END IF
+#    END IF
+#  END IF
 #END FUNCTION
 #
 #PRIVATE FUNCTION undo(parent, parentDir)
@@ -1482,25 +1645,21 @@ exit $mycode
 #    IF tag == "File" THEN
 #      IF os.Path.exists(path) THEN
 #        IF NOT os.Path.delete(path) THEN
-#          DISPLAY "couldn't delete:", path
+#          IF NOT _opt_quiet THEN
+#            CALL printStderr(SFMT("Could not delete file:%1", formatPath(path)))
+#            --get the OS error printed
+#            RUN SFMT("%1 %2", IIF(isWin(), "del /Q", "rm"), quote(path))
+#          END IF
 #        ELSE
-#          IF _opt_verbose THEN
-#            DISPLAY "deleted file:", path
+#          IF NOT _opt_quiet THEN
+#            DISPLAY "deleted file:", formatPath(path)
 #          END IF
 #        END IF
 #      END IF
 #    END IF
 #    CALL undo(child, path)
 #    IF tag == "Dir" THEN
-#      IF os.Path.exists(path) AND os.Path.isDirectory(path) THEN
-#        IF NOT os.Path.delete(path) THEN
-#          DISPLAY "Could not delete dir:", path, ",probably not empty"
-#        ELSE
-#          IF _opt_verbose THEN
-#            DISPLAY "deleted dir:", path, "/"
-#          END IF
-#        END IF
-#      END IF
+#      CALL myDeleteDir(path)
 #    END IF
 #    LET child = child.getNext()
 #  END WHILE
@@ -1522,8 +1681,8 @@ exit $mycode
 #      OTHERWISE
 #        CALL myErr(SFMT("unexpected tagName:%1", tag))
 #    END CASE
-#    IF _opt_verbose THEN
-#      DISPLAY "verified:", path
+#    IF NOT _opt_quiet THEN
+#      DISPLAY "verified:", formatPath(path)
 #    END IF
 #    CALL verify(child, path)
 #    LET child = child.getNext()
@@ -1531,9 +1690,10 @@ exit $mycode
 #END FUNCTION
 #
 ##+check if the unzip command did work
-#PRIVATE FUNCTION simulate(parent, parentDir)
+#PRIVATE FUNCTION simulate(parent, parentDir, sb)
 #  DEFINE parent, child om.DomNode
 #  DEFINE parentDir, path, tag, marker STRING
+#  DEFINE sb base.StringBuffer
 #  LET child = parent.getFirstChild()
 #  WHILE child IS NOT NULL
 #    LET path = os.Path.join(parentDir, child.getAttribute("name"))
@@ -1544,8 +1704,12 @@ exit $mycode
 #          LET marker = IIF(os.Path.isFile(path), "C", "D")
 #        ELSE
 #          LET marker = "N"
+#          IF _opt_undo THEN
+#            GOTO continue_simulate
+#          END IF
 #        END IF
-#        DISPLAY SFMT("%1 %2%3", marker, path, os.Path.separator())
+#        CALL sb.append(
+#            SFMT("\n%1 %2%3", marker, formatPath(path), os.Path.separator()))
 #        IF marker == "C" THEN
 #          DISPLAY "  expected: directory, actual: file"
 #        END IF
@@ -1554,23 +1718,26 @@ exit $mycode
 #          LET marker = IIF(os.Path.isDirectory(path), "C", "F")
 #        ELSE
 #          LET marker = "N"
+#          IF _opt_undo THEN
+#            GOTO continue_simulate
+#          END IF
 #        END IF
-#        DISPLAY SFMT("%1 %2", marker, path)
+#        CALL sb.append(SFMT("\n%1 %2", marker, formatPath(path)))
 #        IF marker == "C" THEN
 #          DISPLAY "  expected: file, actual: directory"
 #        END IF
 #      OTHERWISE
 #        CALL myErr(SFMT("unexpected tagName:%1", tag))
 #    END CASE
-#    CALL simulate(child, path)
+#    LABEL continue_simulate:
+#    CALL simulate(child, path, sb)
 #    LET child = child.getNext()
 #  END WHILE
 #END FUNCTION
 #
-#PRIVATE FUNCTION checkFilesExisting(root)
-#  DEFINE root om.DomNode
-#  DEFINE dh INT
-#  DEFINE fname, ans STRING
+#PRIVATE FUNCTION checkFilesExisting(numDirs, numFiles)
+#  DEFINE numDirs, numFiles, dh INT
+#  DEFINE fname, ff STRING
 #  DEFINE foundEntries INT
 #  LET dh = os.Path.dirOpen(os.Path.pwd())
 #  IF dh == 0 THEN
@@ -1584,15 +1751,96 @@ exit $mycode
 #  END WHILE
 #  CALL os.Path.dirClose(dh)
 #  IF foundEntries > 0 THEN
-#    LET ans =
-#        yesno(
-#            SFMT("There are already %1 files, folders or links in this directory...\nContinue extracting %2 files ?",
-#                foundEntries, getNumChildren(root)))
-#    --DISPLAY "ans:",ans
-#    IF NOT ans.equals("yes") THEN
-#      EXIT PROGRAM 1
-#    END IF
+#    LET ff = IIF(numDirs > 0, SFMT("%1 directories", numDirs), NULL)
+#    LET ff =
+#        IIF(numFiles > 0,
+#            SFMT("%1%2 files",
+#                IIF(ff IS NOT NULL, SFMT("%1 and ", ff), ""), numFiles),
+#            ff)
+#    CALL confirm_or_exit(
+#        SFMT("The directory:%1 is not empty(%2 files or folders inside)...\nContinue extracting %3 in this directory ?",
+#            formatPath(os.Path.pwd()), foundEntries, ff))
 #  END IF
+#END FUNCTION
+#
+#PRIVATE FUNCTION checkFilesOverwriting(root, extractDir, hint)
+#  DEFINE root om.DomNode
+#  DEFINE extractDir, hint STRING
+#  DEFINE numOvr, numConflicts, numFiles INT
+#  CALL checkFilesOverwritingInt(root, os.Path.pwd())
+#      RETURNING numConflicts, numOvr
+#  CASE
+#    WHEN numConflicts > 0
+#      CALL confirm_or_exit(
+#          SFMT("Found %1 conflicts(files overwriting existing directories or directories overwriting existing files...\nReally Continue extracting files?",
+#              numConflicts))
+#    WHEN numOvr > 0
+#      LET numFiles = getNumFiles(root)
+#      CALL confirm_or_exit(
+#          SFMT("%1 files will be overwritten beneath %2%3%4...\nContinue extracting %5 files?",
+#              numOvr,
+#              extractDir,
+#              hint,
+#              IIF(numOvr == numFiles,
+#                  "\n(probably a previous version is overwritten)",
+#                  ""),
+#              numFiles))
+#  END CASE
+#END FUNCTION
+#
+#PRIVATE FUNCTION findName(parent, name)
+#  DEFINE parent, child om.DomNode
+#  DEFINE name STRING
+#  LET child = parent.getFirstChild()
+#  WHILE child IS NOT NULL
+#    IF child.getAttribute("name") == name THEN
+#      RETURN child
+#    END IF
+#    LET child = child.getNext()
+#  END WHILE
+#  RETURN NULL
+#END FUNCTION
+#
+##+ checks how many files we overwrite and how much potential conflicts we may have
+#PRIVATE FUNCTION checkFilesOverwritingInt(parent, dir)
+#  DEFINE parent, child om.DomNode
+#  DEFINE dir, type, full, fname STRING
+#  DEFINE dh INT
+#  DEFINE ovr, retOvr INT
+#  DEFINE conflicts, retConflicts INT
+#  LET dh = os.Path.dirOpen(dir)
+#  IF dh == 0 THEN
+#    CALL userError(SFMT("Can't open directory '%1'", os.Path.pwd()))
+#  END IF
+#  WHILE (fname := os.Path.dirNext(dh)) IS NOT NULL
+#    IF fname == "." OR fname == ".." THEN
+#      CONTINUE WHILE
+#    END IF
+#    LET child = findName(parent, fname)
+#    LET type = IIF(child IS NOT NULL, child.getTagName(), "none")
+#    LET full = os.Path.join(dir, fname)
+#    CASE
+#      WHEN type.equals("File")
+#        IF os.Path.isFile(full) THEN
+#          LET ovr = ovr + 1
+#        ELSE
+#          LET conflicts = conflicts + 1
+#        END IF
+#      WHEN type.equals("Dir")
+#        IF os.Path.isDirectory(full) THEN
+#          CALL checkFilesOverwritingInt(child, full)
+#              RETURNING retConflicts, retOvr
+#          LET conflicts = conflicts + retConflicts
+#          LET ovr = ovr + retOvr
+#        ELSE
+#          LET conflicts = conflicts + 1
+#        END IF
+#        --OTHERWISE
+#        --  DISPLAY "unknown type:", type, " for:", full
+#    END CASE
+#  END WHILE
+#  CALL os.Path.dirClose(dh)
+#  RETURN conflicts, ovr
 #END FUNCTION
 #
 #PRIVATE FUNCTION isGBC(root)
@@ -1620,7 +1868,7 @@ exit $mycode
 #  LET gbcDir = SFMT("%1/web_utilities/gbc/gbc", getFglDir())
 #  CALL mkdirp(gbcDir)
 #  CALL myChdir(gbcDir)
-#  CALL unzip(root)
+#  CALL unzip(root, NULL)
 #END FUNCTION
 #
 #PRIVATE FUNCTION unzipOverFGLDIR(root)
@@ -1629,7 +1877,7 @@ exit $mycode
 #    CALL unzipGBCoverFGLDIR(root)
 #  ELSE
 #    CALL myChdir(getFglDir())
-#    CALL unzip(root)
+#    CALL unzip(root, NULL)
 #  END IF
 #END FUNCTION
 #
@@ -1640,7 +1888,7 @@ exit $mycode
 #  LET ch_sh = base.Channel.create()
 #  LET name_sh = SFMT("rm-%1.sh", computeDefName())
 #  CALL ch_sh.openFile(name_sh, "w")
-#  CALL ch_sh.writeLine("#!/bin/bash")
+#  CALL ch_sh.writeLine("#!/bin/sh")
 #  IF isWin() THEN
 #    LET ch_bat = base.Channel.create()
 #    LET name_bat = SFMT("rm-%1.bat", computeDefName())
@@ -1697,11 +1945,14 @@ exit $mycode
 #
 #--utils
 #
-#PRIVATE FUNCTION isWin() RETURNS BOOLEAN
-#  RETURN os.Path.separator().equals("\\")
+#FUNCTION isWin()
+#  DEFINE sep STRING
+#  LET sep = os.Path.separator()
+#  RETURN sep.equals("\\")
 #END FUNCTION
 #
-#PRIVATE FUNCTION printStderr(errstr STRING)
+#PRIVATE FUNCTION printStderr(errstr)
+#  DEFINE errstr STRING
 #  DEFINE ch base.Channel
 #  LET ch = base.Channel.create()
 #  CALL ch.openFile("<stderr>", "w")
@@ -1720,7 +1971,8 @@ exit $mycode
 #END FUNCTION
 #}
 #
-#PRIVATE FUNCTION myErr(errstr STRING)
+#PRIVATE FUNCTION myErr(errstr)
+#  DEFINE errstr STRING
 #  CALL printStderr(
 #      SFMT("ERROR:%1 stack:\n%2", errstr, base.Application.getStackTrace()))
 #  EXIT PROGRAM 1
@@ -1742,7 +1994,7 @@ exit $mycode
 #END FUNCTION
 #}
 #
-#PRIVATE FUNCTION already_quoted(path) RETURNS BOOLEAN
+#PRIVATE FUNCTION already_quoted(path)
 #  DEFINE path, first, last STRING
 #  LET first = NVL(path.getCharAt(1), "NULL")
 #  LET last = NVL(path.getCharAt(path.getLength()), "NULL")
@@ -1752,15 +2004,19 @@ exit $mycode
 #  RETURN (first == "'" AND last == "'") OR (first == '"' AND last == '"')
 #END FUNCTION
 #
-#PRIVATE FUNCTION quote(path STRING) RETURNS STRING
+#PRIVATE FUNCTION quote(path)
+#  DEFINE path STRING
 #  RETURN quoteInt(path, FALSE)
 #END FUNCTION
 #
-#PRIVATE FUNCTION quoteForce(path STRING) RETURNS STRING
+#PRIVATE FUNCTION quoteForce(path)
+#  DEFINE path STRING
 #  RETURN quoteInt(path, TRUE)
 #END FUNCTION
 #
-#PRIVATE FUNCTION quoteInt(path STRING, force BOOLEAN) RETURNS STRING
+#PRIVATE FUNCTION quoteInt(path, force)
+#  DEFINE path STRING
+#  DEFINE force BOOLEAN
 #  IF force OR path.getIndexOf(" ", 1) > 0 THEN
 #    IF NOT already_quoted(path) THEN
 #      LET path = '"', path, '"'
@@ -1773,9 +2029,8 @@ exit $mycode
 #  RETURN path
 #END FUNCTION
 #
-#PRIVATE FUNCTION replace(
-#    src STRING, oldStr STRING, newString STRING)
-#    RETURNS STRING
+#PRIVATE FUNCTION replace(src, oldStr, newString)
+#  DEFINE src, oldStr, newString STRING
 #  DEFINE b base.StringBuffer
 #  LET b = base.StringBuffer.create()
 #  CALL b.append(src)
@@ -1783,26 +2038,28 @@ exit $mycode
 #  RETURN b.toString()
 #END FUNCTION
 #
-#PRIVATE FUNCTION backslash2slash(src STRING) RETURNS STRING
+#PRIVATE FUNCTION backslash2slash(src)
+#  DEFINE src STRING
 #  RETURN replace(src, "\\", "/")
 #END FUNCTION
 #
 ##+case insensitive variant of getIndexOf
-#PRIVATE FUNCTION getIndexOfI(src, pattern, idx) RETURNS INT
+#PRIVATE FUNCTION getIndexOfI(src, pattern, idx)
 #  DEFINE src, pattern STRING
 #  DEFINE idx INTEGER
 #  LET src = src.toLowerCase()
 #  RETURN src.getIndexOf(pattern.toLowerCase(), idx)
 #END FUNCTION
 #
-#PRIVATE FUNCTION getProgramOutputWithErr(cmd STRING) RETURNS(STRING, STRING)
+#FUNCTION getProgramOutputWithErr(cmd)
+#  DEFINE cmd STRING
 #  DEFINE cmdOrig, tmpName, errStr STRING
 #  DEFINE txt TEXT
 #  DEFINE ret STRING
 #  DEFINE code INT
 #  LET cmdOrig = cmd
 #  LET tmpName = makeTempName()
-#  LET cmd = cmd, ">", tmpName, " 2>&1"
+#  LET cmd = cmd, ">", quote(tmpName), " 2>&1"
 #  --CALL log(sfmt("run:%1", cmd))
 #  RUN cmd RETURNING code
 #  LOCATE txt IN FILE tmpName
@@ -1823,8 +2080,8 @@ exit $mycode
 #  RETURN ret, errStr
 #END FUNCTION
 #
-#PRIVATE FUNCTION getProgramOutput(cmd STRING) RETURNS STRING
-#  DEFINE result, err STRING
+#PRIVATE FUNCTION getProgramOutput(cmd)
+#  DEFINE cmd, result, err STRING
 #  CALL getProgramOutputWithErr(cmd) RETURNING result, err
 #  IF err IS NOT NULL THEN
 #    CALL userError(SFMT("failed to RUN:%1%2", cmd, err))
@@ -1833,7 +2090,7 @@ exit $mycode
 #END FUNCTION
 #
 ##+computes a temporary file name
-#PRIVATE FUNCTION makeTempName() RETURNS STRING
+#FUNCTION makeTempName()
 #  DEFINE tmpDir, tmpName, sbase, curr STRING
 #  DEFINE sb base.StringBuffer
 #  DEFINE i INT
@@ -1864,21 +2121,24 @@ exit $mycode
 #-- returns
 #-- -<count>-g<SHA> for a non release
 #-- -<SHA> for a release (GIT_COMMIT_COUNT==0)
-#PRIVATE FUNCTION adjustGitCountAndRev(cnt INT, rev STRING)
+#PRIVATE FUNCTION adjustGitCountAndRev(cnt, rev)
+#  DEFINE cnt INT
+#  DEFINE rev, countInfo, ret, warn STRING
 #  --don't display 0 and g in the revision for official releases
-#  VAR countInfo = IIF(cnt == 0, "", SFMT("-%1", cnt))
+#  LET countInfo = IIF(cnt == 0, "", SFMT("-%1", cnt))
 #  LET rev = IIF(cnt == 0, rev.subString(2, rev.getLength()), rev)
-#  VAR ret = SFMT("%1-%2", countInfo, rev)
-#  VAR warn
-#      = IIF(cnt == 0,
+#  LET ret = SFMT("%1-%2", countInfo, rev)
+#  LET warn =
+#      IIF(cnt == 0,
 #          "",
 #          " (nightly build - not suitable for production purposes)")
 #  LET ret = SFMT("%1%2", ret, warn)
 #  RETURN ret
 #END FUNCTION
 #
-#PRIVATE FUNCTION removeExtension(fname STRING) RETURNS STRING
-#  VAR ext = os.Path.extension(fname)
+#PRIVATE FUNCTION removeExtension(fname)
+#  DEFINE fname, ext STRING
+#  LET ext = os.Path.extension(fname)
 #  IF ext.getLength() > 0 THEN
 #    LET fname = fname.subString(1, fname.getLength() - (ext.getLength() + 1))
 #  END IF
@@ -1886,18 +2146,21 @@ exit $mycode
 #END FUNCTION
 #
 #PRIVATE FUNCTION printVersion()
-#  VAR prog = removeExtension(os.Path.baseName(arg_val(0)))
+#  DEFINE prog STRING
+#  LET prog = removeExtension(os.Path.baseName(arg_val(0)))
 #  DISPLAY SFMT("%1 %2 rev%3",
 #      prog, GIT_VERSION, adjustGitCountAndRev(GIT_COMMIT_COUNT, GIT_REV))
 #  EXIT PROGRAM 0
 #END FUNCTION
 #
-#PRIVATE FUNCTION isLetter(c STRING)
-#  VAR letters = "abcdefghijklmnopqrstuvwxyz"
-#  RETURN getIndexOfI(src: letters, pattern: c, idx: 1) > 0
+#PRIVATE FUNCTION isLetter(c)
+#  DEFINE c, letters STRING
+#  LET letters = "abcdefghijklmnopqrstuvwxyz"
+#  RETURN getIndexOfI(letters, c, 1) > 0
 #END FUNCTION
 #
-#PRIVATE FUNCTION isWinDriveInt(path STRING)
+#PRIVATE FUNCTION isWinDriveInt(path)
+#  DEFINE path STRING
 #  RETURN isWin()
 #      AND path.getCharAt(2) == ":"
 #      AND (path.getCharAt(3) == "\\" OR path.getCharAt(3) == "/")
@@ -1909,18 +2172,24 @@ exit $mycode
 #END FUNCTION
 #}
 #
-#PRIVATE FUNCTION pathStartsWithWinDrive(path STRING)
+#PRIVATE FUNCTION pathStartsWithWinDrive(path)
+#  DEFINE path STRING
 #  RETURN path.getLength() >= 3 AND isWinDriveInt(path)
 #END FUNCTION
 #
 ##creates a directory path recursively like mkdir -p
-#PRIVATE FUNCTION mkdirp(path STRING)
-#  VAR winbase = FALSE
-#  VAR level = 0
+#FUNCTION mkdirp(path)
+#  DEFINE path STRING
+#  DEFINE winbase BOOLEAN
+#  DEFINE level INT
+#  DEFINE basedir, part, next STRING
+#  DEFINE tok base.StringTokenizer
+#  LET winbase = FALSE
+#  LET level = 0
 #  IF isWin() AND path.getIndexOf("\\", 1) > 0 THEN
 #    LET path = backslash2slash(path)
 #  END IF
-#  VAR basedir = "."
+#  LET basedir = "."
 #  CASE
 #    WHEN path.getCharAt(1) == "/"
 #      LET basedir = "/"
@@ -1930,11 +2199,11 @@ exit $mycode
 #      --DISPLAY "winbase:",basedir
 #      LET winbase = TRUE
 #  END CASE
-#  VAR tok = base.StringTokenizer.create(path, "/")
-#  VAR part = basedir
+#  LET tok = base.StringTokenizer.create(path, "/")
+#  LET part = basedir
 #  WHILE tok.hasMoreTokens()
 #    LET level = level + 1
-#    VAR next = tok.nextToken()
+#    LET next = tok.nextToken()
 #    --DISPLAY "part0:",part,",next:",next
 #    IF level == 1 AND winbase THEN
 #      MYASSERT(basedir == next)
@@ -1959,22 +2228,24 @@ exit $mycode
 #  END WHILE
 #END FUNCTION
 #
-#PRIVATE FUNCTION progName() RETURNS STRING
-#  VAR ret = os.Path.baseName(arg_val(0))
-#  VAR ext = os.Path.extension(ret)
+#PRIVATE FUNCTION progName()
+#  DEFINE ret, ext STRING
+#  LET ret = os.Path.baseName(arg_val(0))
+#  LET ext = os.Path.extension(ret)
 #  IF ext.getLength() > 0 THEN
 #    LET ret = ret.subString(1, ret.getLength() - ext.getLength() - 1)
 #  END IF
 #  RETURN ret
 #END FUNCTION
 #
-#PRIVATE FUNCTION userError(err STRING)
+#PRIVATE FUNCTION userError(err)
+#  DEFINE err STRING
 #  CALL printStderr(SFMT("Error %1:%2", progName(), err))
 #  EXIT PROGRAM 1
 #END FUNCTION
 #
-#PRIVATE FUNCTION whichExe(prog STRING) RETURNS STRING
-#  DEFINE exe, err, cmd STRING
+#PRIVATE FUNCTION whichExe(prog)
+#  DEFINE prog, exe, err, cmd STRING
 #  LET cmd = IIF(isWin(), "where", "which")
 #  CALL getProgramOutputWithErr(SFMT("%1 %2", cmd, quote(prog)))
 #      RETURNING exe, err
@@ -1996,7 +2267,8 @@ exit $mycode
 #      base.Application.getProgramDir(), os.Path.baseName(arg_val(0)))
 #END FUNCTION
 #
-#PRIVATE FUNCTION writeStringToFile(file STRING, content STRING)
+#FUNCTION writeStringToFile(file, content)
+#  DEFINE file, content STRING
 #  DEFINE ch base.Channel
 #  LET ch = base.Channel.create()
 #  CALL ch.openFile(file, "w")
@@ -2004,13 +2276,30 @@ exit $mycode
 #  CALL ch.close()
 #END FUNCTION
 #
-#FUNCTION readTextFile(filename) RETURNS STRING
+#FUNCTION readTextFile(filename)
 #  DEFINE filename STRING
 #  DEFINE content STRING
 #  DEFINE t TEXT
 #  LOCATE t IN FILE filename
 #  LET content = t
 #  RETURN content
+#END FUNCTION
+#
+#FUNCTION formatPath(path)
+#  DEFINE path, fgldir STRING
+#  CASE
+#    WHEN _pwd == path
+#      RETURN "working dir"
+#    WHEN path.getIndexOf(_pwd, 1) == 1
+#      RETURN quote(path.subString(_pwd.getLength() + 2, path.getLength()))
+#    WHEN os.Path.pwd() == _fgldir
+#      LET fgldir = IIF(isWin(), "%FGLDIR%", "$FGLDIR")
+#      RETURN quote(
+#          SFMT("%1%2",
+#              fgldir,
+#              path.subString(_fgldir.getLength() + 1, path.getLength())))
+#  END CASE
+#  RETURN path
 #END FUNCTION
 #
 #FUNCTION yesno_mode()
@@ -2027,7 +2316,11 @@ exit $mycode
 #  DEFINE message STRING
 #  DEFINE cmd, ans, resfile STRING
 #  DEFINE code INT
-#  CALL fgl_setenv("FGLGUI", "0")
+#  IF NOT isWin() THEN
+#    IF fgl_getenv("INFORMIXTERM") IS NULL THEN
+#      CALL fgl_setenv("INFORMIXTERM", "terminfo") --nowadays: the better default
+#    END IF
+#  END IF
 #  CALL fgl_setenv("__FGL_UNZIP_YESNO_MESSAGE__", message)
 #  LET resfile = makeTempName()
 #  CALL fgl_setenv("__FGL_UNZIP_RESULT_FILE__", resfile)
@@ -2047,16 +2340,27 @@ exit $mycode
 #--and calls a MENU with yes no
 #PRIVATE FUNCTION yesno(message)
 #  DEFINE message STRING
-#  DEFINE fglgui, ans, resfile, frmfile STRING
+#  DEFINE fglgui, ans, resfile, frmfile, ret STRING
+#  IF _opt_overwrite OR _opt_simulate THEN
+#    IF _opt_simulate THEN
+#      DISPLAY "If answer to '", message, "' is yes..."
+#    END IF
+#    RETURN "yes"
+#  END IF
 #  LET fglgui = fgl_getenv("FGLGUI")
 #  IF NOT fglgui.equals("0") THEN --run sub process
-#    RETURN yesno_cmd(message)
+#    CALL fgl_setenv("FGLGUI", "0")
+#    LET ret = yesno_cmd(message)
+#    CALL fgl_setenv("FGLGUI", fglgui)
+#    RETURN ret
 #  END IF
 #  LET resfile = fgl_getenv("__FGL_UNZIP_RESULT_FILE__")
 #  LET frmfile = makeTempName(), ".42f"
 #  CALL writeStringToFile(frmfile, fglunzip_42f())
-#  OPTIONS MENU LINE 5
-#  OPTIONS COMMENT LINE 6
+#  --DISPLAY 'fgl_getenv("FGLGUI")=',fgl_getenv("FGLGUI")
+#  OPTIONS FORM LINE 2
+#  OPTIONS MENU LINE 6
+#  OPTIONS COMMENT LINE 7
 #  OPEN FORM f FROM frmfile
 #  DISPLAY FORM f
 #  CALL os.Path.delete(frmfile) RETURNING status
@@ -2070,17 +2374,28 @@ exit $mycode
 #      EXIT MENU
 #  END MENU
 #  IF resfile IS NOT NULL THEN
-#    CALL writeStringToFile(resfile, content: ans)
+#    CALL writeStringToFile(resfile, ans)
 #  END IF
 #  RETURN ans
 #END FUNCTION
 #
+#FUNCTION confirm_or_exit(message)
+#  DEFINE message, ans STRING
+#  LET ans = yesno(message)
+#  --DISPLAY "ans:",ans
+#  IF NOT ans.equals("yes") THEN
+#    EXIT PROGRAM 1
+#  END IF
+#END FUNCTION
+#
 #--returns fglunzip.per ready compiled
 #FUNCTION fglunzip_42f()
-#  RETURN '<?xml version=\'1.0\' encoding=\'UTF-8\'?>\n<Form name="fglunzip" build="5.01.02" width="80" height="2" delimiters="">\n<Screen width="80" height="2">\n<FormField name="formonly.msg" colName="msg" fieldId="0" sqlTabName="formonly" tabIndex="1">\n<TextEdit wantReturns="1" scrollBars="none" scroll="0" height="2" width="78" posY="0" posX="1" gridWidth="78" gridHeight="2"/>\n</FormField>\n</Screen>\n<RecordView tabName="formonly">\n<Link colName="msg" fieldIdRef="0"/>\n</RecordView>\n</Form>'
+#  RETURN '<?xml version=\'1.0\' encoding=\'UTF-8\'?>\n<Form name="fglunzip" build="5.01.02" width="80" height="4" delimiters="">\n<Screen width="80" height="4">\n<FormField name="formonly.msg" colName="msg" fieldId="0" sqlTabName="formonly" tabIndex="1">\n<TextEdit wantReturns="1" scrollBars="none" scroll="0" height="4" width="78" posY="0" posX="1" gridWidth="78" gridHeight="2"/>\n</FormField>\n</Screen>\n<RecordView tabName="formonly">\n<Link colName="msg" fieldIdRef="0"/>\n</RecordView>\n</Form>'
 #END FUNCTION
 #--SCREEN
 #--{
+#--[msg                                                                           ]
+#--[msg                                                                           ]
 #--[msg                                                                           ]
 #--[msg                                                                           ]
 #--}
