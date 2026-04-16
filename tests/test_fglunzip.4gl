@@ -59,7 +59,8 @@ FUNCTION report()
   END IF
 END FUNCTION
 
-FUNCTION begin_test(name STRING)
+FUNCTION begin_test(name)
+  DEFINE name STRING
   LET _current_test = name
   LET _test_ok = TRUE
 END FUNCTION
@@ -74,7 +75,9 @@ FUNCTION end_test()
 END FUNCTION
 
 -- Assert condition is true; on failure mark the test failed and print msg.
-FUNCTION check(cond BOOLEAN, msg STRING)
+FUNCTION check(cond, msg)
+  DEFINE cond BOOLEAN
+  DEFINE msg STRING
   IF NOT NVL(cond, FALSE) THEN
     IF _test_ok THEN
       DISPLAY SFMT("FAIL  %1", _current_test)
@@ -90,7 +93,8 @@ END FUNCTION
 
 -- Quote a value for shell inclusion.
 -- cmd.exe uses double quotes; Unix shells use single quotes.
-FUNCTION qt(s STRING) RETURNS STRING
+FUNCTION qt(s)
+  DEFINE s STRING
   IF fglunzip.isWin() THEN
     RETURN SFMT("\"%1\"", s)
   ELSE
@@ -99,13 +103,17 @@ FUNCTION qt(s STRING) RETURNS STRING
 END FUNCTION
 
 -- Return TRUE if output contains needle.
-FUNCTION has(out STRING, needle STRING) RETURNS BOOLEAN
+FUNCTION has(out, needle)
+  --RETURNS BOOLEAN
+  DEFINE out, needle STRING
   RETURN out.getIndexOf(needle, 1) > 0
 END FUNCTION
 
 -- Run the fglunzip script from workdir with the given argument string.
 -- Returns ok=TRUE when exit code is 0, and the captured stdout+stderr.
-FUNCTION run_fglunzip(workdir STRING, args STRING) RETURNS(BOOLEAN, STRING)
+FUNCTION run_fglunzip(workdir, args)
+  -- RETURNS(BOOLEAN, STRING)
+  DEFINE workdir, args STRING
   DEFINE output, err STRING
   DEFINE cmd STRING
   -- "cd /d" changes both directory and drive on Windows cmd.exe.
@@ -120,8 +128,8 @@ END FUNCTION
 
 -- Create a zip with multiple top-level entries: a.txt, b.txt, subdir/c.txt.
 -- Returns the path to the created .zip file.
-FUNCTION make_rootless_zip(td STRING, zipname STRING) RETURNS STRING
-  DEFINE zipfile STRING
+FUNCTION make_rootless_zip(td, zipname)
+  DEFINE td, zipname, zipfile STRING
   DEFINE srcdir STRING
   LET zipfile = os.Path.join(td, zipname || ".zip")
   LET srcdir = os.Path.join(td, "src_" || zipname)
@@ -143,10 +151,9 @@ END FUNCTION
 
 -- Create a zip whose only top-level entry is a directory named rootname.
 -- Returns the path to the created .zip file.
-FUNCTION make_singleroot_zip(
-    td STRING, zipname STRING, rootname STRING)
-    RETURNS STRING
-  DEFINE zipfile STRING
+FUNCTION make_singleroot_zip(td {STRING}, zipname {STRING}, rootname {STRING})
+  --  RETURNS STRING
+  DEFINE td, zipname, rootname, zipfile STRING
   DEFINE srcdir, rootdir STRING
   LET zipfile = os.Path.join(td, zipname || ".zip")
   LET srcdir = os.Path.join(td, "src_" || zipname)

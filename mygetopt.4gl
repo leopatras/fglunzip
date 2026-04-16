@@ -162,15 +162,18 @@ MAIN
 
 END MAIN
 
-PUBLIC FUNCTION opt_arg(gr GetoptR) RETURNS STRING
+PUBLIC FUNCTION opt_arg(gr)
+  DEFINE gr GetoptR
   RETURN gr[1].opt_arg
 END FUNCTION
 
-PUBLIC FUNCTION opt_char(gr GetoptR) RETURNS STRING
+PUBLIC FUNCTION opt_char(gr)
+  DEFINE gr GetoptR
   RETURN gr[1].opt_char
 END FUNCTION
 
-PUBLIC FUNCTION option_index(gr GetoptR) RETURNS STRING
+PUBLIC FUNCTION option_index(gr)
+  DEFINE gr GetoptR
   RETURN gr[1].option_index
 END FUNCTION
 
@@ -179,9 +182,10 @@ END FUNCTION
 #+ @param ind First argument to copy
 #+
 #+ @return An array of string
-PUBLIC FUNCTION copyArguments(ind INTEGER) RETURNS DYNAMIC ARRAY OF STRING
+PUBLIC FUNCTION copyArguments(ind)
+-- RETURNS DYNAMIC ARRAY OF STRING
+  DEFINE ind, i INTEGER
   DEFINE argv DYNAMIC ARRAY OF STRING
-  DEFINE i INTEGER
   DEFINE argc INTEGER
 
   LET argc = 0
@@ -192,9 +196,10 @@ PUBLIC FUNCTION copyArguments(ind INTEGER) RETURNS DYNAMIC ARRAY OF STRING
   RETURN argv
 END FUNCTION
 
-PUBLIC FUNCTION copyArgumentsFromArr(
-    argsarr DYNAMIC ARRAY OF STRING, ind INTEGER)
-    RETURNS DYNAMIC ARRAY OF STRING
+PUBLIC FUNCTION copyArgumentsFromArr(argsarr, ind)
+  --  RETURNS DYNAMIC ARRAY OF STRING
+  DEFINE argsarr DYNAMIC ARRAY OF STRING
+  DEFINE ind INT
   DEFINE argv DYNAMIC ARRAY OF STRING
   DEFINE i INTEGER
   DEFINE argc INTEGER
@@ -212,9 +217,9 @@ END FUNCTION
 #+ @param argv The arguments list to expand
 #+
 #+ @return An array of string
-PRIVATE FUNCTION expandArguments(
-    argv DYNAMIC ARRAY OF STRING)
-    RETURNS(INTEGER, DYNAMIC ARRAY OF STRING)
+PRIVATE FUNCTION expandArguments(argv)
+  --RETURNS(INTEGER, DYNAMIC ARRAY OF STRING)
+  DEFINE argv DYNAMIC ARRAY OF STRING
   DEFINE rv DYNAMIC ARRAY OF STRING
   DEFINE i INTEGER
   DEFINE argc INTEGER
@@ -251,6 +256,30 @@ PRIVATE FUNCTION expandArguments(
   RETURN SUCCESS, rv
 END FUNCTION
 
+PRIVATE FUNCTION searchName(options, name)
+  DEFINE options GetoptOptions
+  DEFINE name STRING
+  DEFINE i INT
+  FOR i = 1 TO options.getLength()
+    IF options[i].name == name THEN
+      RETURN i
+    END IF
+  END FOR
+  RETURN 0
+END FUNCTION
+
+PRIVATE FUNCTION searchOptChar(options, opt_char)
+  DEFINE options GetoptOptions
+  DEFINE opt_char STRING
+  DEFINE i INT
+  FOR i = 1 TO options.getLength()
+    IF options[i].opt_char == opt_char THEN
+      RETURN i
+    END IF
+  END FOR
+  RETURN 0
+END FUNCTION
+
 #+
 #+ Getopt isAnOption method.
 #+
@@ -260,20 +289,24 @@ END FUNCTION
 #+
 #+ @return TRUE if parameter is a valid option, FALSE otherwise
 #+
-PRIVATE FUNCTION isAnOption(gr GetoptR, param STRING) RETURNS BOOLEAN
+PRIVATE FUNCTION isAnOption(gr, param)
+  DEFINE gr GetoptR
+  DEFINE param STRING
   # An option must start with - or --
   IF param.getCharAt(1) == '-' THEN
     LET param = param.subString(2, param.getLength())
     IF param.getCharAt(1) == '-' THEN
       # Handle long option
       LET param = param.subString(2, param.getLength())
-      IF gr[1]._options.search("name", param) > 0 THEN
+      --IF gr[1]._options.search("name", param) > 0 THEN
+      IF searchName(gr[1]._options, param) > 0 THEN
         RETURN TRUE # Is a long option
       END IF
     ELSE
       IF param.getLength() == 1 THEN
         # Handle short option
-        IF gr[1]._options.search("opt_char", param) > 0 THEN
+        --IF gr[1]._options.search("opt_char", param) > 0 THEN
+        IF searchOptChar(gr[1]._options, param) > 0 THEN
           RETURN TRUE # Is a short option
         END IF
       END IF
@@ -303,18 +336,23 @@ END FUNCTION
 #+ @param options    The GetoptOptions array of options definitions
 #+
 #+
-PUBLIC FUNCTION initialize(
-    gr GetoptR,
-    prog_name STRING,
-    argv DYNAMIC ARRAY OF STRING,
-    options GetoptOptions)
+PUBLIC FUNCTION initialize(gr, prog_name, argv, options)
+  DEFINE gr GetoptR
+  DEFINE prog_name STRING
+  DEFINE argv DYNAMIC ARRAY OF STRING
+  DEFINE options GetoptOptions
+  DEFINE i INT
   LET gr[1].prog_name = prog_name
   LET gr[1].next_char = NULL
   LET gr[1].opt_ind = 0
   LET gr[1].opt_char = ""
   LET gr[1].opt_arg = NULL
   LET gr[1].status = SUCCESS
-  CALL options.copyTo(gr[1]._options)
+  CALL gr[1]._options.clear()
+  --CALL options.copyTo(gr[1]._options)
+  FOR i = 1 TO options.getLength()
+    LET gr[1]._options[i].* = options[i].*
+  END FOR
   CALL expandArguments(argv) RETURNING gr[1].status, gr[1].argv
 END FUNCTION
 
@@ -326,7 +364,9 @@ END FUNCTION
 #+
 #+ @param options    The GetoptOptions array of options definitions
 #+
-PUBLIC FUNCTION initDefault(gr GetoptR, options GetoptOptions)
+PUBLIC FUNCTION initDefault(gr, options)
+  DEFINE gr GetoptR
+  DEFINE options GetoptOptions
   CALL initialize(gr, os.Path.baseName(arg_val(0)), copyArguments(1), options)
 END FUNCTION
 
@@ -336,7 +376,8 @@ END FUNCTION
 #+
 #+ @return The number of additional arguments.
 #+
-PUBLIC FUNCTION getMoreArgumentCount(gr GetoptR) RETURNS INTEGER
+PUBLIC FUNCTION getMoreArgumentCount(gr)
+  DEFINE gr GetoptR
   IF gr[1].status == EOF THEN
     RETURN gr[1].argv.getLength() - gr[1].opt_ind + 1
   END IF
@@ -363,7 +404,9 @@ END FUNCTION
 #+
 #+ @return The value of the additional argument.
 #+
-PUBLIC FUNCTION getMoreArgument(gr GetoptR, ind INTEGER) RETURNS STRING
+PUBLIC FUNCTION getMoreArgument(gr, ind)
+  DEFINE gr GetoptR
+  DEFINE ind INTEGER
   DEFINE x INTEGER
   LET x = gr[1].opt_ind + ind - 1
   IF x > 0 AND x <= gr[1].argv.getLength() THEN
@@ -379,7 +422,8 @@ END FUNCTION
 #+
 #+ @return TRUE if the option parsing is done.
 #+
-PUBLIC FUNCTION isEof(gr GetoptR) RETURNS BOOLEAN
+PUBLIC FUNCTION isEof(gr)
+  DEFINE gr GetoptR
   RETURN gr[1].status == EOF
 END FUNCTION
 
@@ -390,7 +434,8 @@ END FUNCTION
 #+
 #+ @return TRUE if the option parsing detected an invalid argument.
 #+
-PUBLIC FUNCTION invalidOptionSeen(gr GetoptR) RETURNS BOOLEAN
+PUBLIC FUNCTION invalidOptionSeen(gr)
+  DEFINE gr GetoptR
   RETURN gr[1].status == BAD_OPTION
 END FUNCTION
 
@@ -400,7 +445,8 @@ END FUNCTION
 #+
 #+ @return TRUE if the option parsing succeeded.
 #+
-PUBLIC FUNCTION isSuccess(gr GetoptR) RETURNS BOOLEAN
+PUBLIC FUNCTION isSuccess(gr)
+  DEFINE gr GetoptR
   RETURN gr[1].status == SUCCESS
 END FUNCTION
 
@@ -420,7 +466,8 @@ END FUNCTION
 #+
 #+ @return The processing status (getopt.SUCCESS | getopt.EOF | getopt.BAD_ARGUMENT)
 #+
-PUBLIC FUNCTION getopt(gr GetoptR) RETURNS INTEGER
+PUBLIC FUNCTION getopt(gr)
+  DEFINE gr GetoptR
   DEFINE arg STRING
 
   IF gr[1].status != SUCCESS THEN
@@ -463,7 +510,9 @@ END FUNCTION
 #+
 #+ @param more_args The non option string to add to usage
 #+
-PUBLIC FUNCTION displayUsage(gr GetoptR, more_args STRING)
+PUBLIC FUNCTION displayUsage(gr, more_args)
+  DEFINE gr GetoptR
+  DEFINE more_args STRING
   DEFINE ind INTEGER
   DEFINE delta INTEGER
   DEFINE sb base.StringBuffer
@@ -515,7 +564,8 @@ PUBLIC FUNCTION displayUsage(gr GetoptR, more_args STRING)
 END FUNCTION
 
 # Set status to EOF
-PRIVATE FUNCTION eof(gr GetoptR) RETURNS INTEGER
+PRIVATE FUNCTION eof(gr)
+  DEFINE gr GetoptR
   LET gr[1].opt_char = NULL
   LET gr[1].opt_arg = NULL
   LET gr[1].status = EOF
@@ -523,7 +573,8 @@ PRIVATE FUNCTION eof(gr GetoptR) RETURNS INTEGER
 END FUNCTION
 
 # Set status to BAD_OPTION
-PRIVATE FUNCTION bad_option(gr GetoptR) RETURNS INTEGER
+PRIVATE FUNCTION bad_option(gr)
+  DEFINE gr GetoptR
   LET gr[1].opt_char = NULL
   LET gr[1].opt_arg = NULL
   LET gr[1].status = BAD_OPTION
@@ -531,7 +582,8 @@ PRIVATE FUNCTION bad_option(gr GetoptR) RETURNS INTEGER
 END FUNCTION
 
 # Parse current argument as a long option name
-PRIVATE FUNCTION parseLong(gr GetoptR) RETURNS INTEGER
+PRIVATE FUNCTION parseLong(gr)
+  DEFINE gr GetoptR
   DEFINE arg STRING
   DEFINE equal_sign_index INTEGER
   DEFINE ind INTEGER
@@ -627,7 +679,8 @@ PRIVATE FUNCTION parseLong(gr GetoptR) RETURNS INTEGER
 END FUNCTION
 
 # Parse current argument as a short option name
-PRIVATE FUNCTION parseShort(gr GetoptR) RETURNS INTEGER
+PRIVATE FUNCTION parseShort(gr)
+  DEFINE gr GetoptR
   DEFINE arg STRING
   DEFINE equal_sign_index INTEGER
   DEFINE ind INTEGER

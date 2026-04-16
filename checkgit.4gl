@@ -8,16 +8,17 @@ DEFINE git_fgl_commit_count STRING
 DEFINE git_fgl_rev STRING
 MAIN
   DEFINE verbose BOOLEAN
+  DEFINE versionContent, prevContent STRING
   LET verbose = fgl_getenv("VERBOSE") IS NOT NULL
   CALL parseVersion(arg_val(1), FALSE)
-  VAR versionContent = SFMT("%1", formatContent())
+  LET versionContent = SFMT("%1", formatContent())
   IF NOT os.Path.exists(FGLUTILS_VERSION_INC) THEN
     IF verbose THEN
       DISPLAY FGLUTILS_VERSION_INC, " not found: create."
     END IF
     CALL writeStringToFile(FGLUTILS_VERSION_INC, versionContent)
   ELSE
-    VAR prevContent = readTextFile(FGLUTILS_VERSION_INC)
+    LET prevContent = readTextFile(FGLUTILS_VERSION_INC)
     IF NOT versionContent.equals(prevContent) THEN
       IF verbose THEN
         DISPLAY FGLUTILS_VERSION_INC,
@@ -33,16 +34,22 @@ MAIN
   END IF
 END MAIN
 
-FUNCTION isNumber(c STRING)
-  VAR numbers = "0123456789"
+FUNCTION isNumber(c)
+  DEFINE c, numbers STRING
+  LET numbers = "0123456789"
   RETURN numbers.getIndexOf(c, 1) <> 0
 END FUNCTION
 
-FUNCTION parseVersion(longver STRING, fgl BOOLEAN)
-  VAR i = 1
-  VAR tok = base.StringTokenizer.create(longver, "-")
+FUNCTION parseVersion(longver, fgl)
+  DEFINE longver STRING
+  DEFINE fgl BOOLEAN
+  DEFINE i INT
+  DEFINE tok base.StringTokenizer
+  DEFINE nextToken STRING
+  LET i = 1
+  LET tok = base.StringTokenizer.create(longver, "-")
   WHILE tok.hasMoreTokens()
-    VAR nextToken = tok.nextToken()
+    LET nextToken = tok.nextToken()
     CASE i
       WHEN 1
         IF nextToken.getIndexOf("v", 1) == 1 THEN
@@ -70,7 +77,7 @@ FUNCTION parseVersion(longver STRING, fgl BOOLEAN)
   END WHILE
 END FUNCTION
 
-FUNCTION readTextFile(filename) RETURNS STRING
+FUNCTION readTextFile(filename)
   DEFINE filename STRING
   DEFINE content STRING
   DEFINE t TEXT
@@ -79,7 +86,8 @@ FUNCTION readTextFile(filename) RETURNS STRING
   RETURN content
 END FUNCTION
 
-FUNCTION writeStringToFile(file STRING, content STRING)
+FUNCTION writeStringToFile(file, content)
+  DEFINE file, content STRING
   DEFINE ch base.Channel
   LET ch = base.Channel.create()
   CALL ch.openFile(file, "w")
@@ -87,18 +95,12 @@ FUNCTION writeStringToFile(file STRING, content STRING)
   CALL ch.close()
 END FUNCTION
 
-FUNCTION formatContent() RETURNS STRING
-  RETURN SFMT(`public CONSTANT GIT_VERSION="%1"
-public CONSTANT GIT_COMMIT_COUNT=%2
-public CONSTANT GIT_REV="%3"
-`,
+FUNCTION formatContent()
+  RETURN SFMT('public CONSTANT GIT_VERSION="%1"\npublic CONSTANT GIT_COMMIT_COUNT=%2\npublic CONSTANT GIT_REV="%3"',
       git_version, git_commit_count, git_rev)
 END FUNCTION
 
-FUNCTION formatFGLContent() RETURNS STRING
-  RETURN SFMT(`public CONSTANT GIT_FGL_VERSION="%1"
-public CONSTANT GIT_FGL_COMMIT_COUNT=%2
-public CONSTANT GIT_FGL_REV="%3"
-`,
+FUNCTION formatFGLContent()
+  RETURN SFMT('public CONSTANT GIT_FGL_VERSION="%1"\npublic CONSTANT GIT_FGL_COMMIT_COUNT=%2\npublic CONSTANT GIT_FGL_REV="%3"',
       git_fgl_version, git_fgl_commit_count, git_fgl_rev)
 END FUNCTION

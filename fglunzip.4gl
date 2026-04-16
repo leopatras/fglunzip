@@ -673,7 +673,7 @@ PRIVATE FUNCTION checkFilesOverwritingInt(parent, dir)
         END IF
       WHEN type.equals("Dir")
         IF os.Path.isDirectory(full) THEN
-          CALL checkFilesOverwritingInt(parent: child, dir: full)
+          CALL checkFilesOverwritingInt(child, full)
               RETURNING retConflicts, retOvr
           LET conflicts = conflicts + retConflicts
           LET ovr = ovr + retOvr
@@ -790,11 +790,14 @@ END FUNCTION
 
 --utils
 
-FUNCTION isWin() RETURNS BOOLEAN
-  RETURN os.Path.separator().equals("\\")
+FUNCTION isWin()
+  DEFINE sep STRING
+  LET sep = os.Path.separator()
+  RETURN sep.equals("\\")
 END FUNCTION
 
-PRIVATE FUNCTION printStderr(errstr STRING)
+PRIVATE FUNCTION printStderr(errstr)
+  DEFINE errstr STRING
   DEFINE ch base.Channel
   LET ch = base.Channel.create()
   CALL ch.openFile("<stderr>", "w")
@@ -813,7 +816,8 @@ PRIVATE FUNCTION printStdout(str STRING, noNewLine BOOLEAN)
 END FUNCTION
 }
 
-PRIVATE FUNCTION myErr(errstr STRING)
+PRIVATE FUNCTION myErr(errstr)
+  DEFINE errstr STRING
   CALL printStderr(
       SFMT("ERROR:%1 stack:\n%2", errstr, base.Application.getStackTrace()))
   EXIT PROGRAM 1
@@ -835,7 +839,7 @@ PRIVATE FUNCTION dlog(s STRING)
 END FUNCTION
 }
 
-PRIVATE FUNCTION already_quoted(path) RETURNS BOOLEAN
+PRIVATE FUNCTION already_quoted(path)
   DEFINE path, first, last STRING
   LET first = NVL(path.getCharAt(1), "NULL")
   LET last = NVL(path.getCharAt(path.getLength()), "NULL")
@@ -845,15 +849,19 @@ PRIVATE FUNCTION already_quoted(path) RETURNS BOOLEAN
   RETURN (first == "'" AND last == "'") OR (first == '"' AND last == '"')
 END FUNCTION
 
-PRIVATE FUNCTION quote(path STRING) RETURNS STRING
+PRIVATE FUNCTION quote(path)
+  DEFINE path STRING
   RETURN quoteInt(path, FALSE)
 END FUNCTION
 
-PRIVATE FUNCTION quoteForce(path STRING) RETURNS STRING
+PRIVATE FUNCTION quoteForce(path)
+  DEFINE path STRING
   RETURN quoteInt(path, TRUE)
 END FUNCTION
 
-PRIVATE FUNCTION quoteInt(path STRING, force BOOLEAN) RETURNS STRING
+PRIVATE FUNCTION quoteInt(path, force)
+  DEFINE path STRING
+  DEFINE force BOOLEAN
   IF force OR path.getIndexOf(" ", 1) > 0 THEN
     IF NOT already_quoted(path) THEN
       LET path = '"', path, '"'
@@ -866,9 +874,8 @@ PRIVATE FUNCTION quoteInt(path STRING, force BOOLEAN) RETURNS STRING
   RETURN path
 END FUNCTION
 
-PRIVATE FUNCTION replace(
-    src STRING, oldStr STRING, newString STRING)
-    RETURNS STRING
+PRIVATE FUNCTION replace(src, oldStr, newString)
+  DEFINE src, oldStr, newString STRING
   DEFINE b base.StringBuffer
   LET b = base.StringBuffer.create()
   CALL b.append(src)
@@ -876,19 +883,21 @@ PRIVATE FUNCTION replace(
   RETURN b.toString()
 END FUNCTION
 
-PRIVATE FUNCTION backslash2slash(src STRING) RETURNS STRING
+PRIVATE FUNCTION backslash2slash(src)
+  DEFINE src STRING
   RETURN replace(src, "\\", "/")
 END FUNCTION
 
 #+case insensitive variant of getIndexOf
-PRIVATE FUNCTION getIndexOfI(src, pattern, idx) RETURNS INT
+PRIVATE FUNCTION getIndexOfI(src, pattern, idx)
   DEFINE src, pattern STRING
   DEFINE idx INTEGER
   LET src = src.toLowerCase()
   RETURN src.getIndexOf(pattern.toLowerCase(), idx)
 END FUNCTION
 
-FUNCTION getProgramOutputWithErr(cmd STRING) RETURNS(STRING, STRING)
+FUNCTION getProgramOutputWithErr(cmd)
+  DEFINE cmd STRING
   DEFINE cmdOrig, tmpName, errStr STRING
   DEFINE txt TEXT
   DEFINE ret STRING
@@ -916,8 +925,8 @@ FUNCTION getProgramOutputWithErr(cmd STRING) RETURNS(STRING, STRING)
   RETURN ret, errStr
 END FUNCTION
 
-PRIVATE FUNCTION getProgramOutput(cmd STRING) RETURNS STRING
-  DEFINE result, err STRING
+PRIVATE FUNCTION getProgramOutput(cmd)
+  DEFINE cmd, result, err STRING
   CALL getProgramOutputWithErr(cmd) RETURNING result, err
   IF err IS NOT NULL THEN
     CALL userError(SFMT("failed to RUN:%1%2", cmd, err))
@@ -926,7 +935,7 @@ PRIVATE FUNCTION getProgramOutput(cmd STRING) RETURNS STRING
 END FUNCTION
 
 #+computes a temporary file name
-FUNCTION makeTempName() RETURNS STRING
+FUNCTION makeTempName()
   DEFINE tmpDir, tmpName, sbase, curr STRING
   DEFINE sb base.StringBuffer
   DEFINE i INT
@@ -957,21 +966,24 @@ END FUNCTION
 -- returns
 -- -<count>-g<SHA> for a non release
 -- -<SHA> for a release (GIT_COMMIT_COUNT==0)
-PRIVATE FUNCTION adjustGitCountAndRev(cnt INT, rev STRING)
+PRIVATE FUNCTION adjustGitCountAndRev(cnt, rev)
+  DEFINE cnt INT
+  DEFINE rev, countInfo, ret, warn STRING
   --don't display 0 and g in the revision for official releases
-  VAR countInfo = IIF(cnt == 0, "", SFMT("-%1", cnt))
+  LET countInfo = IIF(cnt == 0, "", SFMT("-%1", cnt))
   LET rev = IIF(cnt == 0, rev.subString(2, rev.getLength()), rev)
-  VAR ret = SFMT("%1-%2", countInfo, rev)
-  VAR warn
-      = IIF(cnt == 0,
+  LET ret = SFMT("%1-%2", countInfo, rev)
+  LET warn =
+      IIF(cnt == 0,
           "",
           " (nightly build - not suitable for production purposes)")
   LET ret = SFMT("%1%2", ret, warn)
   RETURN ret
 END FUNCTION
 
-PRIVATE FUNCTION removeExtension(fname STRING) RETURNS STRING
-  VAR ext = os.Path.extension(fname)
+PRIVATE FUNCTION removeExtension(fname)
+  DEFINE fname, ext STRING
+  LET ext = os.Path.extension(fname)
   IF ext.getLength() > 0 THEN
     LET fname = fname.subString(1, fname.getLength() - (ext.getLength() + 1))
   END IF
@@ -979,18 +991,21 @@ PRIVATE FUNCTION removeExtension(fname STRING) RETURNS STRING
 END FUNCTION
 
 PRIVATE FUNCTION printVersion()
-  VAR prog = removeExtension(os.Path.baseName(arg_val(0)))
+  DEFINE prog STRING
+  LET prog = removeExtension(os.Path.baseName(arg_val(0)))
   DISPLAY SFMT("%1 %2 rev%3",
       prog, GIT_VERSION, adjustGitCountAndRev(GIT_COMMIT_COUNT, GIT_REV))
   EXIT PROGRAM 0
 END FUNCTION
 
-PRIVATE FUNCTION isLetter(c STRING)
-  VAR letters = "abcdefghijklmnopqrstuvwxyz"
-  RETURN getIndexOfI(src: letters, pattern: c, idx: 1) > 0
+PRIVATE FUNCTION isLetter(c)
+  DEFINE c, letters STRING
+  LET letters = "abcdefghijklmnopqrstuvwxyz"
+  RETURN getIndexOfI(letters, c, 1) > 0
 END FUNCTION
 
-PRIVATE FUNCTION isWinDriveInt(path STRING)
+PRIVATE FUNCTION isWinDriveInt(path)
+  DEFINE path STRING
   RETURN isWin()
       AND path.getCharAt(2) == ":"
       AND (path.getCharAt(3) == "\\" OR path.getCharAt(3) == "/")
@@ -1002,18 +1017,24 @@ PRIVATE FUNCTION isWinDriveRoot(path STRING)
 END FUNCTION
 }
 
-PRIVATE FUNCTION pathStartsWithWinDrive(path STRING)
+PRIVATE FUNCTION pathStartsWithWinDrive(path)
+  DEFINE path STRING
   RETURN path.getLength() >= 3 AND isWinDriveInt(path)
 END FUNCTION
 
 #creates a directory path recursively like mkdir -p
-FUNCTION mkdirp(path STRING)
-  VAR winbase = FALSE
-  VAR level = 0
+FUNCTION mkdirp(path)
+  DEFINE path STRING
+  DEFINE winbase BOOLEAN
+  DEFINE level INT
+  DEFINE basedir, part, next STRING
+  DEFINE tok base.StringTokenizer
+  LET winbase = FALSE
+  LET level = 0
   IF isWin() AND path.getIndexOf("\\", 1) > 0 THEN
     LET path = backslash2slash(path)
   END IF
-  VAR basedir = "."
+  LET basedir = "."
   CASE
     WHEN path.getCharAt(1) == "/"
       LET basedir = "/"
@@ -1023,11 +1044,11 @@ FUNCTION mkdirp(path STRING)
       --DISPLAY "winbase:",basedir
       LET winbase = TRUE
   END CASE
-  VAR tok = base.StringTokenizer.create(path, "/")
-  VAR part = basedir
+  LET tok = base.StringTokenizer.create(path, "/")
+  LET part = basedir
   WHILE tok.hasMoreTokens()
     LET level = level + 1
-    VAR next = tok.nextToken()
+    LET next = tok.nextToken()
     --DISPLAY "part0:",part,",next:",next
     IF level == 1 AND winbase THEN
       MYASSERT(basedir == next)
@@ -1052,22 +1073,24 @@ FUNCTION mkdirp(path STRING)
   END WHILE
 END FUNCTION
 
-PRIVATE FUNCTION progName() RETURNS STRING
-  VAR ret = os.Path.baseName(arg_val(0))
-  VAR ext = os.Path.extension(ret)
+PRIVATE FUNCTION progName()
+  DEFINE ret, ext STRING
+  LET ret = os.Path.baseName(arg_val(0))
+  LET ext = os.Path.extension(ret)
   IF ext.getLength() > 0 THEN
     LET ret = ret.subString(1, ret.getLength() - ext.getLength() - 1)
   END IF
   RETURN ret
 END FUNCTION
 
-PRIVATE FUNCTION userError(err STRING)
+PRIVATE FUNCTION userError(err)
+  DEFINE err STRING
   CALL printStderr(SFMT("Error %1:%2", progName(), err))
   EXIT PROGRAM 1
 END FUNCTION
 
-PRIVATE FUNCTION whichExe(prog STRING) RETURNS STRING
-  DEFINE exe, err, cmd STRING
+PRIVATE FUNCTION whichExe(prog)
+  DEFINE prog, exe, err, cmd STRING
   LET cmd = IIF(isWin(), "where", "which")
   CALL getProgramOutputWithErr(SFMT("%1 %2", cmd, quote(prog)))
       RETURNING exe, err
@@ -1089,7 +1112,8 @@ PRIVATE FUNCTION fullProgName()
       base.Application.getProgramDir(), os.Path.baseName(arg_val(0)))
 END FUNCTION
 
-FUNCTION writeStringToFile(file STRING, content STRING)
+FUNCTION writeStringToFile(file, content)
+  DEFINE file, content STRING
   DEFINE ch base.Channel
   LET ch = base.Channel.create()
   CALL ch.openFile(file, "w")
@@ -1097,7 +1121,7 @@ FUNCTION writeStringToFile(file STRING, content STRING)
   CALL ch.close()
 END FUNCTION
 
-FUNCTION readTextFile(filename) RETURNS STRING
+FUNCTION readTextFile(filename)
   DEFINE filename STRING
   DEFINE content STRING
   DEFINE t TEXT
@@ -1195,7 +1219,7 @@ PRIVATE FUNCTION yesno(message)
       EXIT MENU
   END MENU
   IF resfile IS NOT NULL THEN
-    CALL writeStringToFile(resfile, content: ans)
+    CALL writeStringToFile(resfile, ans)
   END IF
   RETURN ans
 END FUNCTION
