@@ -22,12 +22,10 @@ END MAIN
 -- ============================================================
 
 FUNCTION setup()
-  DEFINE script STRING
-  LET script = IIF(fglunzip.isWin(), "fglunzip.bat", "fglunzip")
   LET _fglunzip_path =
       os.Path.fullPath(
           os.Path.join(
-              os.Path.join(base.Application.getProgramDir(), ".."), script))
+              os.Path.join(base.Application.getProgramDir(), ".."), "fglunzip"))
   IF fglunzip.isWin() THEN
     LET _work_dir =
         os.Path.join(

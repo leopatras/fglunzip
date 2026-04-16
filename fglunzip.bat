@@ -27,5 +27,10 @@ IF %errorlevel% NEQ 0 GOTO myend
 popd
 %MYDRIVE%
 fglrun %FGLUNZIPDIR%\fglunzip.42m %*
+IF %errorlevel% NEQ 0 GOTO myerr
 :myend
 ENDLOCAL
+GOTO :EOF
+
+:myerr
+exit /B %errorlevel%
