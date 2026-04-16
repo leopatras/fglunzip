@@ -469,6 +469,8 @@ PRIVATE FUNCTION myDeleteDir(path)
     IF NOT os.Path.delete(path) THEN
       IF NOT _opt_quiet THEN
         DISPLAY "Could not delete dir:", formatPath(path), ",probably not empty"
+        --get the OS error printed
+        RUN SFMT("rmdir %1", quote(path))
       END IF
     ELSE
       IF NOT _opt_quiet THEN
@@ -489,7 +491,9 @@ PRIVATE FUNCTION undo(parent, parentDir)
       IF os.Path.exists(path) THEN
         IF NOT os.Path.delete(path) THEN
           IF NOT _opt_quiet THEN
-            DISPLAY "couldn't delete:", formatPath(path)
+            CALL printStderr(SFMT("Could not delete file:%1", formatPath(path)))
+            --get the OS error printed
+            RUN SFMT("%1 %2", IIF(isWin(), "del /Q", "rm"), quote(path))
           END IF
         ELSE
           IF NOT _opt_quiet THEN
@@ -786,7 +790,7 @@ END FUNCTION
 
 --utils
 
-PRIVATE FUNCTION isWin() RETURNS BOOLEAN
+FUNCTION isWin() RETURNS BOOLEAN
   RETURN os.Path.separator().equals("\\")
 END FUNCTION
 
@@ -884,14 +888,14 @@ PRIVATE FUNCTION getIndexOfI(src, pattern, idx) RETURNS INT
   RETURN src.getIndexOf(pattern.toLowerCase(), idx)
 END FUNCTION
 
-PRIVATE FUNCTION getProgramOutputWithErr(cmd STRING) RETURNS(STRING, STRING)
+FUNCTION getProgramOutputWithErr(cmd STRING) RETURNS(STRING, STRING)
   DEFINE cmdOrig, tmpName, errStr STRING
   DEFINE txt TEXT
   DEFINE ret STRING
   DEFINE code INT
   LET cmdOrig = cmd
   LET tmpName = makeTempName()
-  LET cmd = cmd, ">", tmpName, " 2>&1"
+  LET cmd = cmd, ">", quote(tmpName), " 2>&1"
   --CALL log(sfmt("run:%1", cmd))
   RUN cmd RETURNING code
   LOCATE txt IN FILE tmpName
@@ -922,7 +926,7 @@ PRIVATE FUNCTION getProgramOutput(cmd STRING) RETURNS STRING
 END FUNCTION
 
 #+computes a temporary file name
-PRIVATE FUNCTION makeTempName() RETURNS STRING
+FUNCTION makeTempName() RETURNS STRING
   DEFINE tmpDir, tmpName, sbase, curr STRING
   DEFINE sb base.StringBuffer
   DEFINE i INT
@@ -1003,7 +1007,7 @@ PRIVATE FUNCTION pathStartsWithWinDrive(path STRING)
 END FUNCTION
 
 #creates a directory path recursively like mkdir -p
-PRIVATE FUNCTION mkdirp(path STRING)
+FUNCTION mkdirp(path STRING)
   VAR winbase = FALSE
   VAR level = 0
   IF isWin() AND path.getIndexOf("\\", 1) > 0 THEN
@@ -1085,7 +1089,7 @@ PRIVATE FUNCTION fullProgName()
       base.Application.getProgramDir(), os.Path.baseName(arg_val(0)))
 END FUNCTION
 
-PRIVATE FUNCTION writeStringToFile(file STRING, content STRING)
+FUNCTION writeStringToFile(file STRING, content STRING)
   DEFINE ch base.Channel
   LET ch = base.Channel.create()
   CALL ch.openFile(file, "w")
